@@ -1,6 +1,6 @@
-import { Thread } from "@/lib/types";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import type { Thread } from "@/lib/types";
 
 export function useThreads() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -20,7 +20,7 @@ export function useThreads() {
   }, []);
 
   useEffect(() => {
-    void loadThreads();
+    loadThreads();
   }, [loadThreads]);
 
   const selectThread = useCallback((id: string) => {

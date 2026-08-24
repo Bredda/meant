@@ -1,6 +1,7 @@
-import { AppLayout } from "@/components/layout";
 import { createBrowserRouter, RouterProvider } from "react-router";
+import { AppLayout } from "@/components/layout";
 import { threadLoader, threadsLoader } from "../features/threads/thread-loader";
+
 const createAppRouter = () =>
   createBrowserRouter([
     {

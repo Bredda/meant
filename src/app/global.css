@@ -1,6 +1,5 @@
 @import "tailwindcss";
-
-@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -197,6 +196,8 @@
     @apply border-border outline-ring/50;
   }
   html {
+    @apply h-full;
+
     /* For native desktop app feeling disallow text selection. */
     @apply select-none;
 
@@ -204,7 +205,20 @@
     @apply h-full overscroll-none;
   }
   body {
-    @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+    @apply h-full;
+    @apply bg-background text-foreground;
   }
+
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+}
+
+/* Allow specific text selection */
+[data-slot="bubble-content"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }

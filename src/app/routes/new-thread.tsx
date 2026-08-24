@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useNavigate, useRevalidator } from "react-router";
+import { ThreadInput } from "../../features/threads/components/thread-input";
 import { useThread } from "../../features/threads/thread-context";
-import { ThreadInput } from "../../features/threads/thread-input";
 
 export function NewThreadPage() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export function NewThreadPage() {
 
   const handleSubmit = useCallback(
     (input: string) => {
-      void sendMessage(input, {
+      sendMessage(input, {
         onThreadCreated: (thread) => {
           revalidator.revalidate();
           navigate(`/threads/${thread.id}`, {
@@ -23,14 +23,14 @@ export function NewThreadPage() {
         },
       });
     },
-    [navigate, sendMessage],
+    [navigate, sendMessage, revalidator.revalidate]
   );
   return (
-    <div className="h-full flex items-center justify-center">
+    <div className="flex h-full min-h-0 items-center justify-center">
       <ThreadInput
         className="my-auto max-w-3xl"
-        onSubmit={handleSubmit}
         isBusy={isBusy}
+        onSubmit={handleSubmit}
       />
     </div>
   );

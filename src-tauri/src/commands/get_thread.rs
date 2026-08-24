@@ -2,7 +2,7 @@ use tauri::{State};
 use serde::Serialize;
 
 use crate::{
-    db::models::{Thread, ThreadMessage},
+    db::models::{Thread, StoredThreadMessage},
     AppState,
 };
 
@@ -10,7 +10,7 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct ThreadData {
     pub thread: Thread,
-    pub messages: Vec<ThreadMessage>,
+    pub messages: Vec<StoredThreadMessage>,
 }
 
 #[tauri::command]

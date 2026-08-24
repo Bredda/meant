@@ -1,7 +1,7 @@
-import { ThreadMessage } from "./types";
 import { invoke } from "@tauri-apps/api/core";
+import type { ThreadMessage } from "./types";
 
-export async function getThreadMessages(threadId: string) {
+export function getThreadMessages(threadId: string) {
   return invoke<ThreadMessage[]>("get_thread_messages", {
     threadId,
   });

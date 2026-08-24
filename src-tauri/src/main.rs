@@ -5,13 +5,14 @@ mod ai;
 mod commands;
 mod db;
 mod state;
+mod runs;
 
 use tauri::Manager;
 
-use ai::agent::AgentService;
 use db::ThreadRepository;
 use state::AppState;
 
+use crate::{ai::agent::react::ReActAgent, runs::service::RunService};
 
 
 fn main() {
@@ -36,12 +37,11 @@ fn main() {
                     .expect("Invalid database path"),
             )
             .expect("Failed to initialize database");
-
-            let agent =
-                AgentService::new().expect("Failed to initialize AI agent");
+  
+            let agent = ReActAgent::new().expect("Failed to initialize AI agent");
 
             app.manage(AppState {
-                agent,
+                agent: RunService::new(agent),
                 threads,
             });
 

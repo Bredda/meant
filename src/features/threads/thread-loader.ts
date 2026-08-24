@@ -1,12 +1,12 @@
-import { Thread, ThreadMessage } from "@/lib/types";
 import { invoke } from "@tauri-apps/api/core";
+import type { Thread, ThreadMessage } from "@/lib/types";
 
 export type ThreadLoaderData = {
   thread: Thread;
   messages: ThreadMessage[];
 };
 
-export async function threadLoader({
+export function threadLoader({
   params,
 }: {
   params: Record<string, string | undefined>;
@@ -20,6 +20,6 @@ export async function threadLoader({
   });
 }
 
-export async function threadsLoader() {
+export function threadsLoader() {
   return invoke<Thread[]>("list_threads", {});
 }

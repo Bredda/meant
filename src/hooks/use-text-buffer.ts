@@ -11,10 +11,18 @@ export function useTextBuffer({ onFlush }: UseTextBufferOptions) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getCharsToFlush = useCallback((length: number) => {
-    if (length > 200) return 30;
-    if (length > 100) return 20;
-    if (length > 40) return 12;
-    if (length > 10) return 6;
+    if (length > 200) {
+      return 30;
+    }
+    if (length > 100) {
+      return 20;
+    }
+    if (length > 40) {
+      return 12;
+    }
+    if (length > 10) {
+      return 6;
+    }
 
     return 2;
   }, []);
@@ -35,7 +43,7 @@ export function useTextBuffer({ onFlush }: UseTextBufferOptions) {
 
       onFlush(text);
     },
-    [getCharsToFlush, onFlush],
+    [getCharsToFlush, onFlush]
   );
 
   const start = useCallback(() => {
@@ -59,7 +67,7 @@ export function useTextBuffer({ onFlush }: UseTextBufferOptions) {
         flush(true);
       }
     },
-    [flush],
+    [flush]
   );
 
   const append = useCallback((text: string) => {

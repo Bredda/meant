@@ -1,4 +1,4 @@
-import * as React from "react";
+import type React from "react";
 
 import { NavThreads } from "@/components/sidebar/nav-threads";
 import {
@@ -6,7 +6,7 @@ import {
   SidebarContent,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Thread } from "@/lib/types";
+import type { Thread } from "@/lib/types";
 
 type AppSidebarProps = { threads: Thread[] } & React.ComponentProps<
   typeof Sidebar
@@ -21,7 +21,7 @@ export function AppSidebar({ threads, ...props }: AppSidebarProps) {
       <SidebarContent>
         <NavThreads threads={threads} />
       </SidebarContent>
-      <SidebarFooter></SidebarFooter>
+      <SidebarFooter />
     </Sidebar>
   );
 }

@@ -36,3 +36,11 @@ export function formatRelativeTime(timestamp: number): string {
 
   return date.toLocaleDateString();
 }
+
+export function formatJson(raw: string) {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}

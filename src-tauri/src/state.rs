@@ -1,9 +1,10 @@
 use crate::{
-    ai::agent::AgentService,
-    db::ThreadRepository,
+    ai::agent::react::ReActAgent, db::ThreadRepository, runs::service::RunService,
+    
 };
 
+
 pub struct AppState {
-    pub agent: AgentService,
     pub threads: ThreadRepository,
+    pub agent: RunService<ReActAgent>,
 }

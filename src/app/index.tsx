@@ -5,7 +5,7 @@ import AppRouter from "@/app/router";
 
 export default function App() {
   return (
-    <div className="[--header-height:calc(--spacing(14))]">
+    <div className="h-full [--header-height:calc(--spacing(14))]">
       <AppProvider>
         <AppRouter />
       </AppProvider>

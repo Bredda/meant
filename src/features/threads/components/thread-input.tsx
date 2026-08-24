@@ -1,27 +1,26 @@
 import {
-  DropdownMenuTrigger,
+  ArrowUpIcon,
+  GlobeIcon,
+  ImageIcon,
+  PaperclipIcon,
+  PlusIcon,
+  TelescopeIcon,
+} from "lucide-react";
+import { useState } from "react";
+import {
+  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenu,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   InputGroup,
-  InputGroupInput,
   InputGroupAddon,
   InputGroupButton,
+  InputGroupInput,
 } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import {
-  PlusIcon,
-  PaperclipIcon,
-  ImageIcon,
-  TelescopeIcon,
-  GlobeIcon,
-  ArrowUpIcon,
-} from "lucide-react";
-
-import { useState } from "react";
 
 type ThreadInputProps = {
   isBusy: boolean;
@@ -43,25 +42,25 @@ export function ThreadInput({ isBusy, onSubmit, className }: ThreadInputProps) {
   };
 
   return (
-    <form onSubmit={handleSend} className={cn("w-full", className)}>
+    <form className={cn("w-full", className)} onSubmit={handleSend}>
       <InputGroup>
         <InputGroupInput
-          value={input}
           onChange={(e) => setInput(e.target.value)}
+          value={input}
         />
         <InputGroupAddon align="block-end" className="pt-1">
           <DropdownMenu>
             <DropdownMenuTrigger>
               <InputGroupButton
                 aria-label="Add files"
-                type="button"
                 size="icon-sm"
+                type="button"
                 variant="outline"
               >
                 <PlusIcon />
               </InputGroupButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-44">
+            <DropdownMenuContent align="start" className="w-44" side="top">
               <DropdownMenuItem>
                 <PaperclipIcon />
                 Add Photos & Files
@@ -82,11 +81,11 @@ export function ThreadInput({ isBusy, onSubmit, className }: ThreadInputProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           <InputGroupButton
+            className="ml-auto"
+            disabled={!input || isBusy}
+            size="icon-sm"
             type="submit"
             variant="default"
-            size="icon-sm"
-            disabled={!input || isBusy}
-            className="ml-auto"
           >
             <ArrowUpIcon />
             <span className="sr-only">Send</span>

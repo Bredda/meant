@@ -1,11 +1,10 @@
 import { BotMessageSquareIcon, Command, Home, SidebarIcon } from "lucide-react";
-
+import type React from "react";
+import { useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/components/ui/sidebar";
-import { useLocation, useNavigate } from "react-router";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import React from "react";
 
 const HEADER_MENUS: { title: string; to: string; icon: React.ReactNode }[] = [
   {
@@ -37,31 +36,31 @@ export function SiteHeader() {
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">Meant</span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="truncate text-muted-foreground text-xs">
               Personnal
             </span>
           </div>
         </div>
-        <Separator orientation="vertical" className="h-4" />
+        <Separator className="h-4" orientation="vertical" />
         <Button
           className="h-8 w-8"
-          variant="ghost"
-          size="icon"
           onClick={toggleSidebar}
+          size="icon"
+          variant="ghost"
         >
           <SidebarIcon />
         </Button>
-        <Separator orientation="vertical" className="h-4" />
-        <div className="flex-1 flex justify-center items-center gap-2">
+        <Separator className="h-4" orientation="vertical" />
+        <div className="flex flex-1 items-center justify-center gap-2">
           {HEADER_MENUS.map((m) => {
             const isActive = location.pathname === m.to;
             return (
-              <Tooltip>
+              <Tooltip key={m.title}>
                 <TooltipTrigger>
                   <Button
+                    onClick={() => handleNavigate(m.to)}
                     size="icon"
                     variant={isActive ? "default" : "secondary"}
-                    onClick={() => handleNavigate(m.to)}
                   >
                     {m.icon}
                   </Button>

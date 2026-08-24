@@ -7,5 +7,12 @@
       // So it's easier to just exclude them from linting and formatting.
       "!**/components/ui"
     ]
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "useConsistentTypeDefinitions": "off"
+      }
+    }
   }
 }

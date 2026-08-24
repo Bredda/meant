@@ -1,8 +1,7 @@
 use tauri::{ipc::Channel, State};
 
 use crate::{
-    ai::agent::{AgentEvent, ChatMessage, ChatRole},
-    AppState,
+    AppState, ai::agent::types::{AgentEvent, ThreadMessage}, db::models::StoredThreadMessage, runs::service::{Run, RunStatus},
 };
 
 #[derive(serde::Deserialize)]
@@ -18,17 +17,15 @@ pub async fn chat(
     request: ChatRequest,
     channel: Channel<AgentEvent>,
 ) -> Result<(), String> {
+    let run_id = uuid::Uuid::new_v4().to_string();
     println!("New chat request");
+
     // Retrieves or creates thread based on optional request thread_id
     let thread = match request.thread_id {
-        Some(thread_id) => {
-            state
-                .threads
-                .get_thread(&thread_id)?
-                .ok_or_else(|| {
-                    format!("Thread not found: {thread_id}")
-                })?
-        }
+        Some(thread_id) => state
+            .threads
+            .get_thread(&thread_id)?
+            .ok_or_else(|| format!("Thread not found: {thread_id}"))?,
 
         None => {
             let thread = state.threads.create_thread()?;
@@ -36,6 +33,7 @@ pub async fn chat(
             channel
                 .send(AgentEvent::ThreadCreated {
                     thread: thread.clone(),
+                    run_id: run_id.clone(),
                 })
                 .map_err(|e| e.to_string())?;
 
@@ -46,70 +44,113 @@ pub async fn chat(
     // Produces and persists user message
     let user_message_id = uuid::Uuid::new_v4().to_string();
 
-    state.threads.add_message(
+    let stored_user_message = state.threads.add_message(
         &thread.id,
         &user_message_id,
         "user",
         &request.input,
+        None,
+        None,
     )?;
 
     // Produces thread history
-    let stored_messages =
-        state.threads.get_messages(&thread.id)?;
+    let stored_messages = state.threads.get_messages(&thread.id)?;
 
     let messages = stored_messages
         .into_iter()
-        .map(|message| {
-            let role = match message.role.as_str() {
-                "user" => ChatRole::User,
-                "assistant" => ChatRole::Assistant,
-                role => {
-                    return Err(format!(
-                        "Unknown message role: {role}"
-                    ));
-                }
-            };
-
-            Ok(ChatMessage {
-                role,
-                content: message.content,
-            })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
+        .map(ThreadMessage::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
 
     // Runs agent
-    let thread_id = uuid::Uuid::new_v4().to_string();
-
-    let result = state
-        .agent
-        .run(thread_id.clone(), messages, |event| {
-            let _ = channel.send(event);
-        })
-        .await;
-
-    let assistant_content = match result {
-        Ok(content) => content,
-
-        Err(error) => {
-            let _ = channel.send(AgentEvent::Error {
-                thread_id: Some(thread_id),
-                message: error,
-            });
-
-            return Ok(());
-        }
+    let run = Run {
+        id: run_id.clone(),
+        thread_id: thread.id.clone(),
+        status: RunStatus::Running,
     };
 
-    // Persists final assistant message
-    let assistant_message_id =
-        uuid::Uuid::new_v4().to_string();
+    let run_result = state
+        .agent
+        .run(
+            run,
+            messages,
+            Box::new({
+                let channel = channel.clone();
+                move |event| {
+                    let _ = channel.send(event);
+                }
+            }),
+        )
+        .await?;
 
-    state.threads.add_message(
-        &thread.id,
-        &assistant_message_id,
-        "assistant",
-        &assistant_content,
-    )?;
+    // Persists the whole message stack (user message already persisted above)
+    let mut persisted_messages = vec![stored_user_message];
+
+    for message in run_result.messages {
+        if let Some(stored) = persist_thread_message(&state, &thread.id, message)? {
+            persisted_messages.push(stored);
+        }
+    }
+
+    // Emit final event with all persisted messages
+    channel
+        .send(AgentEvent::RunCompleted {
+            thread_id: thread.id.clone(),
+            run_id: run_id.clone(),
+            messages: persisted_messages,
+        })
+        .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+
+/// Maps a produced `ThreadMessage` to a stored row, or `None` for kinds
+/// that are already persisted upstream (e.g. `User`).
+fn persist_thread_message(
+    state: &State<'_, AppState>,
+    thread_id: &str,
+    message: ThreadMessage,
+) -> Result<Option<StoredThreadMessage>, String> {
+    let (id, role, content, tool_call_id, tool_name) = match message {
+        ThreadMessage::Assistant { id, content } => (id, "assistant", content, None, None),
+
+        ThreadMessage::ToolCall {
+            id,
+            tool_call_id,
+            tool_name,
+            arguments,
+        } => (
+            id,
+            "tool_call",
+            serde_json::to_string(&arguments).map_err(|e| e.to_string())?,
+            Some(tool_call_id),
+            Some(tool_name),
+        ),
+
+        ThreadMessage::ToolResult {
+            id,
+            tool_call_id,
+            tool_name,
+            content,
+        } => (
+            id,
+            "tool_result",
+            serde_json::to_string(&content).map_err(|e| e.to_string())?,
+            Some(tool_call_id),
+            Some(tool_name),
+        ),
+
+        ThreadMessage::User { .. } => return Ok(None),
+    };
+
+    let stored = state.threads.add_message(
+        thread_id,
+        &id,
+        role,
+        &content,
+        tool_call_id.as_deref(),
+        tool_name.as_deref(),
+    )?;
+
+    Ok(Some(stored))
 }

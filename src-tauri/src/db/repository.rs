@@ -2,15 +2,13 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::db::models::ThreadMessage;
+use crate::db::models::StoredThreadMessage;
 
 use super::models::Thread;
 
 pub struct ThreadRepository {
     connection: Mutex<Connection>,
 }
-
-
 
 impl ThreadRepository {
     pub fn new(path: &str) -> Result<Self, String> {
@@ -34,6 +32,8 @@ impl ThreadRepository {
                     thread_id TEXT NOT NULL,
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
+                    tool_call_id TEXT,
+                    tool_name TEXT,
                     position INTEGER NOT NULL,
                     created_at INTEGER NOT NULL,
 
@@ -56,6 +56,7 @@ impl ThreadRepository {
     pub fn create_thread(&self) -> Result<Thread, String> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp();
+        let title = "New thread".to_string();
 
         let connection = self
             .connection
@@ -73,13 +74,13 @@ impl ThreadRepository {
                 )
                 VALUES (?1, ?2, ?3, ?4)
                 "#,
-                params![id, "New thread", now, now],
+                params![id, title, now, now],
             )
             .map_err(|e| e.to_string())?;
 
         Ok(Thread {
             id,
-            title: "New thread".to_string(),
+            title,
             created_at: now,
             updated_at: now,
         })
@@ -108,7 +109,7 @@ impl ThreadRepository {
             )
             .map_err(|e| e.to_string())?;
 
-        let thread = statement
+        statement
             .query_row(params![thread_id], |row| {
                 Ok(Thread {
                     id: row.get(0)?,
@@ -118,9 +119,7 @@ impl ThreadRepository {
                 })
             })
             .optional()
-            .map_err(|e| e.to_string())?;
-
-        Ok(thread)
+            .map_err(|e| e.to_string())
     }
 
     pub fn add_message(
@@ -129,7 +128,9 @@ impl ThreadRepository {
         id: &str,
         role: &str,
         content: &str,
-    ) -> Result<ThreadMessage, String> {
+        tool_call_id: Option<&str>,
+        tool_name: Option<&str>,
+    ) -> Result<StoredThreadMessage, String> {
         let connection = self
             .connection
             .lock()
@@ -157,16 +158,20 @@ impl ThreadRepository {
                     thread_id,
                     role,
                     content,
+                    tool_call_id,
+                    tool_name,
                     position,
                     created_at
                 )
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                 "#,
                 params![
                     id,
                     thread_id,
                     role,
                     content,
+                    tool_call_id,
+                    tool_name,
                     position,
                     now
                 ],
@@ -184,11 +189,13 @@ impl ThreadRepository {
             )
             .map_err(|e| e.to_string())?;
 
-        Ok(ThreadMessage {
+        Ok(StoredThreadMessage {
             id: id.to_string(),
             thread_id: thread_id.to_string(),
             role: role.to_string(),
             content: content.to_string(),
+            tool_call_id: tool_call_id.map(str::to_string),
+            tool_name: tool_name.map(str::to_string),
             position,
             created_at: now,
         })
@@ -197,7 +204,7 @@ impl ThreadRepository {
     pub fn get_messages(
         &self,
         thread_id: &str,
-    ) -> Result<Vec<ThreadMessage>, String> {
+    ) -> Result<Vec<StoredThreadMessage>, String> {
         let connection = self
             .connection
             .lock()
@@ -211,6 +218,8 @@ impl ThreadRepository {
                     thread_id,
                     role,
                     content,
+                    tool_call_id,
+                    tool_name,
                     position,
                     created_at
                 FROM messages
@@ -222,13 +231,15 @@ impl ThreadRepository {
 
         let rows = statement
             .query_map(params![thread_id], |row| {
-                Ok(ThreadMessage {
+                Ok(StoredThreadMessage {
                     id: row.get(0)?,
                     thread_id: row.get(1)?,
                     role: row.get(2)?,
                     content: row.get(3)?,
-                    position: row.get(4)?,
-                    created_at: row.get(5)?,
+                    tool_call_id: row.get(4)?,
+                    tool_name: row.get(5)?,
+                    position: row.get(6)?,
+                    created_at: row.get(7)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -238,12 +249,12 @@ impl ThreadRepository {
     }
 
     pub fn list_threads(&self) -> Result<Vec<Thread>, String> {
-        let conn = self
+        let connection = self
             .connection
             .lock()
             .map_err(|_| "Database mutex poisoned".to_string())?;
 
-        let mut statement = conn
+        let mut statement = connection
             .prepare(
                 r#"
                 SELECT

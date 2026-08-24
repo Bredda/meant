@@ -1,20 +1,20 @@
+import { Outlet, useLoaderData } from "react-router";
+import { ThreadProvider } from "@/features/threads/thread-context";
+import type { Thread } from "@/lib/types";
 import { AppSidebar } from "./sidebar/app-sidebar";
 import { SiteHeader } from "./sidebar/site-header";
-import { SidebarProvider, SidebarInset } from "./ui/sidebar";
-import { Outlet, useLoaderData } from "react-router";
+import { SidebarInset, SidebarProvider } from "./ui/sidebar";
 
-import { Thread } from "@/lib/types";
-import { ThreadProvider } from "@/features/threads/thread-context";
 export function AppLayout() {
   const threads = useLoaderData<Thread[]>();
   return (
     <ThreadProvider>
-      <SidebarProvider className="flex flex-col">
+      <SidebarProvider className="flex h-full flex-col">
         <SiteHeader />
-        <div className="flex flex-1">
+        <div className="flex min-h-0 flex-1">
           <AppSidebar threads={threads} />
           <SidebarInset>
-            <div className="flex flex-1 flex-col gap-4 p-4">
+            <div className="flex h-full min-h-0 flex-1 flex-col gap-4 p-4">
               <Outlet />
             </div>
           </SidebarInset>

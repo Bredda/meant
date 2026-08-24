@@ -1,23 +1,22 @@
 "use client";
 
 import { BotMessageSquare, PlusIcon } from "lucide-react";
-
+import { useNavigate } from "react-router";
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { useNavigate } from "react-router";
-import { Thread } from "@/lib/types";
+import type { Thread } from "@/lib/types";
 import { Button } from "../ui/button";
 import {
   Empty,
+  EmptyContent,
+  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
 } from "../ui/empty";
 
 function ThreadsList({ threads }: { threads: Thread[] }) {
@@ -29,9 +28,9 @@ function ThreadsList({ threads }: { threads: Thread[] }) {
 
         return (
           <SidebarMenuButton
+            isActive={active}
             key={t.id}
             onClick={() => navigate(`/threads/${t.id}`)}
-            isActive={active}
           >
             {t.title}
           </SidebarMenuButton>
@@ -71,7 +70,7 @@ export function NavThreads({ threads }: NavThreadsProps) {
   const navigate = useNavigate();
 
   const handleNewThread = (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
+    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
   ) => {
     e.preventDefault();
 

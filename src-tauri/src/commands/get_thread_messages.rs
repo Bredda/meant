@@ -1,7 +1,7 @@
 use tauri::{State};
 
 use crate::{
-    db::models::ThreadMessage,
+    db::models::StoredThreadMessage,
     AppState,
 };
 
@@ -9,6 +9,6 @@ use crate::{
 pub fn get_thread_messages(
     state: State<'_, AppState>,
     thread_id: String,
-) -> Result<Vec<ThreadMessage>, String> {
+) -> Result<Vec<StoredThreadMessage>, String> {
     state.threads.get_messages(&thread_id)
 }

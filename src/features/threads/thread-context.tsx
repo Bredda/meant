@@ -1,4 +1,4 @@
-import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   createContext,
   useCallback,
@@ -7,9 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-
-import { Channel, invoke } from "@tauri-apps/api/core";
 import { useTextBuffer } from "@/hooks/use-text-buffer";
+import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
 
 type SendMessageOptions = {
   onThreadCreated?: (thread: Thread) => void;
@@ -37,47 +36,83 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const [isBusy, setIsBusy] = useState(false);
 
   /*
-   * Refs = état technique du run.
+   * Refs = run technical state.
    *
-   * Ils ne servent PAS à piloter la navigation.
+   * DO NOT use it for navigation purpose.
    */
   const threadIdRef = useRef<string | null>(null);
-  const assistantMessageIdRef = useRef<string | null>(null);
   const activeRunRef = useRef(false);
+
+  /*
+   * Assistant text segment currently streaming.
+   *
+   * Changes on every MessageStarted (one run can produce
+   * multiple segments : text -> tool call -> text...).
+   * null there is no open segment (eg. during a tool call).
+   */
+  const currentAssistantMessageIdRef = useRef<string | null>(null);
+
+  /*
+   * Messages snapshot des messages just before run (before adding
+   * optimistic user message). RunCompleted returns updated list
+   * et is the source of truth for the run messages (including user one),
+   * so build final state is simply :
+   *
+   *   [...snapshot, ...event.data.messages]
+   *
+   * No id matching required, especially for tool calls/results.
+   */
+  const preRunMessagesRef = useRef<ThreadMessage[]>([]);
+
+  /*
+   * Monotonic local position for optimistic messages.
+   * Purely cosmétic : this values are replaced
+   * by position from DB as soon as RunCompleted is received.
+   */
+  const livePositionRef = useRef(0);
 
   const updateMessages = useCallback(
     (
       updater:
         | ThreadMessage[]
-        | ((messages: ThreadMessage[]) => ThreadMessage[]),
+        | ((messages: ThreadMessage[]) => ThreadMessage[])
     ) => {
       setMessages((previous) =>
-        typeof updater === "function" ? updater(previous) : updater,
+        typeof updater === "function" ? updater(previous) : updater
       );
     },
-    [],
+    []
+  );
+
+  const appendMessage = useCallback(
+    (message: ThreadMessage) => {
+      updateMessages((previous) => [...previous, message]);
+    },
+    [updateMessages]
   );
 
   const appendAssistantText = useCallback(
     (text: string) => {
-      const messageId = assistantMessageIdRef.current;
+      const messageId = currentAssistantMessageIdRef.current;
 
       if (!messageId) {
         return;
       }
 
       updateMessages((previous) =>
-        previous.map((message) =>
-          message.id === messageId
-            ? {
-                ...message,
-                content: message.content + text,
-              }
-            : message,
-        ),
+        previous.map((item) => {
+          if (item.id !== messageId || item.role !== "assistant") {
+            return item;
+          }
+
+          return {
+            ...item,
+            content: item.content + text,
+          };
+        })
       );
     },
-    [updateMessages],
+    [updateMessages]
   );
 
   const textBuffer = useTextBuffer({
@@ -90,26 +125,42 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
       activeRunRef.current = false;
 
-      const messageId = assistantMessageIdRef.current;
+      const messageId = currentAssistantMessageIdRef.current;
 
       if (messageId) {
         updateMessages((previous) =>
-          previous.map((item) =>
-            item.id === messageId
-              ? {
-                  ...item,
-                  content: item.content
-                    ? `${item.content}\n\n⚠️ ${message}`
-                    : `⚠️ ${message}`,
-                }
-              : item,
-          ),
+          previous.map((item) => {
+            if (item.id !== messageId || item.role !== "assistant") {
+              return item;
+            }
+
+            return {
+              ...item,
+              content: item.content
+                ? `${item.content}\n\n⚠️ ${message}`
+                : `⚠️ ${message}`,
+            };
+          })
         );
+      } else {
+        /**
+         * Error occured outside test segment
+         * (eg. while exeuting tool call)
+         * so we push a specific assistant message
+         */
+        appendMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `⚠️ ${message}`,
+          position: livePositionRef.current++,
+          thread_id: threadIdRef.current ?? "",
+        });
       }
 
+      currentAssistantMessageIdRef.current = null;
       setIsBusy(false);
     },
-    [textBuffer, updateMessages],
+    [appendMessage, textBuffer, updateMessages]
   );
 
   const sendMessage = useCallback(
@@ -120,33 +171,24 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      /*
-       * Optimistic user message.
+      /**
+       * Snapshot taken BEFORE any optimistic update:
+       * this is the basis on which we build final state when RunCompleted
        */
+      preRunMessagesRef.current = messages;
+      livePositionRef.current = messages.length;
+      currentAssistantMessageIdRef.current = null;
+
+      // Optimistic user message
       const userMessage: ThreadMessage = {
         id: crypto.randomUUID(),
         role: "user",
         content,
+        position: livePositionRef.current++,
+        thread_id: threadIdRef.current ?? "",
       };
 
-      /*
-       * Optimistic assistant message.
-       *
-       * Les MessageDelta vont remplir celui-ci.
-       */
-      const assistantMessageId = crypto.randomUUID();
-
-      assistantMessageIdRef.current = assistantMessageId;
-
-      updateMessages((previous) => [
-        ...previous,
-        userMessage,
-        {
-          id: assistantMessageId,
-          role: "assistant",
-          content: "",
-        },
-      ]);
+      updateMessages((previous) => [...previous, userMessage]);
 
       activeRunRef.current = true;
       setIsBusy(true);
@@ -154,6 +196,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       const channel = new Channel<AgentEvent>();
 
       channel.onmessage = (event) => {
+        console.debug("Received Thread event", event);
         switch (event.type) {
           case "ThreadCreated": {
             const newThread = event.data.thread;
@@ -163,10 +206,8 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
             setThread(newThread);
 
             /*
-             * Le composant de route décide quoi faire
-             * de cet événement.
-             *
-             * Le provider ne navigue jamais.
+             * Routing component decide on what to do.
+             * No navigation from the provider
              */
             options?.onThreadCreated?.(newThread);
 
@@ -174,7 +215,24 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "RunStarted": {
+            break;
+          }
+
+          case "MessageStarted": {
+            const { message_id } = event.data;
+
+            currentAssistantMessageIdRef.current = message_id;
+
+            appendMessage({
+              id: message_id,
+              role: "assistant",
+              content: "",
+              position: livePositionRef.current++,
+              thread_id: threadIdRef.current ?? "",
+            });
+
             textBuffer.start();
+
             break;
           }
 
@@ -183,9 +241,62 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
             break;
           }
 
+          case "MessageCompleted": {
+            /*
+             * Flush + stop : gracefuly close this segment before
+             * any new text segment or tool call is received.
+             */
+            textBuffer.stop(true);
+            currentAssistantMessageIdRef.current = null;
+            break;
+          }
+
+          case "ToolCallStarted": {
+            const { tool_call_id, tool_name, arguments: args } = event.data;
+
+            appendMessage({
+              id: tool_call_id,
+              role: "tool_call",
+              tool_call_id,
+              tool_name,
+              arguments: args,
+              position: livePositionRef.current++,
+              thread_id: threadIdRef.current ?? "",
+            });
+
+            break;
+          }
+
+          case "ToolCallCompleted": {
+            const {
+              tool_call_id,
+              tool_name,
+              content: toolContent,
+            } = event.data;
+
+            appendMessage({
+              id: `${tool_call_id}:result`,
+              role: "tool_result",
+              tool_call_id,
+              tool_name,
+              content: toolContent,
+              position: livePositionRef.current++,
+              thread_id: threadIdRef.current ?? "",
+            });
+
+            break;
+          }
+
           case "RunCompleted": {
             textBuffer.stop(true);
 
+            /*
+             * Updating : RunCompleted returned messages
+             * are truth (stable DB ids). Live state is discarded.
+             */
+            setMessages([...preRunMessagesRef.current, ...event.data.messages]);
+
+            currentAssistantMessageIdRef.current = null;
             activeRunRef.current = false;
             setIsBusy(false);
 
@@ -214,21 +325,13 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         handleError(error instanceof Error ? error.message : String(error));
       }
     },
-    [handleError, textBuffer, updateMessages],
+    [appendMessage, handleError, messages, textBuffer, updateMessages]
   );
 
-  /*
-   * Hydrate le provider depuis le loader
-   * de /threads/:id.
-   */
+  //Hydrates provider from /threads/:id loader.
   const hydrate = useCallback(
     (thread: Thread, threadMessages: ThreadMessage[]) => {
-      /*
-       * Très important :
-       *
-       * un loader ne doit jamais écraser
-       * un run actuellement en cours.
-       */
+      //IMPORTANT : loader MUST NEVER overwrite a pending run.
       if (activeRunRef.current && threadIdRef.current === thread.id) {
         return;
       }
@@ -238,21 +341,18 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       setThread(thread);
       setMessages(threadMessages);
     },
-    [],
+    []
   );
 
-  /*
-   * Reset purement local.
-   *
-   * Pas de navigation.
-   */
+  // Local reset. No navigation
   const reset = useCallback(() => {
     if (activeRunRef.current) {
       return;
     }
 
     threadIdRef.current = null;
-    assistantMessageIdRef.current = null;
+    currentAssistantMessageIdRef.current = null;
+    preRunMessagesRef.current = [];
 
     setThread(null);
     setMessages([]);
@@ -268,7 +368,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       hydrate,
       reset,
     }),
-    [thread, messages, isBusy, sendMessage, hydrate, reset],
+    [thread, messages, isBusy, sendMessage, hydrate, reset]
   );
 
   return (
