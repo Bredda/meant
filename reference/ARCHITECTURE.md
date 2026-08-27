@@ -17,22 +17,18 @@ Meant is a **local-first AI workbench**. The desktop application runs primarily 
                             │
           ┌─────────────────┼─────────────────┐
           │                 │                 │
-         Rig             Storage            Tools
+         Agent            Storage            Tools
           │                 │                 │
-    ┌─────┼─────┐     ┌─────┴─────┐      ┌───┴────┐
-    │     │     │     │           │      │        │
-   LLM  Embed  Agent SQLite     Vector  Native    MCP
-    │     │     │                 │      │        │
-    │ FastEmbed                LanceDB  Git     Servers
-    │                            /SQLite Shell
-    │
-    └──────────────┐
-                   │
-             Local Models
-                   │
-        ┌──────────┼──────────┐
-        │          │          │
-    llama.cpp    Candle     Ollama
+          │           ┌─────┴─────┐      ┌───┴────┐
+          │           │           │      │        │
+          │         SQLite     Vector   Native    MCP
+          │                     Store     │        │
+          │                              Git     Servers
+          │                              Shell
+          │
+    See AGENT.md
+    for the agent
+    execution model
 ```
 
 ### Core principles
@@ -83,18 +79,11 @@ Rust Domain Service
 
 ## 2.2 Agent Layer
 
-`Rig` provides the main abstraction around LLM interactions.
+The agent layer is responsible for turning a conversation into a model run: prompting, tool execution, and streaming the result back to the UI.
 
-Responsibilities:
+This layer is documented separately in **[AGENT.md](./AGENT.md)**, which covers the run lifecycle, the streaming event model, and how tool calls are executed and surfaced.
 
-- Agent lifecycle and execution.
-- Model/provider abstraction.
-- Prompting and conversation context.
-- Streaming responses.
-- Tool execution.
-- Future agent strategies such as ReAct.
-
-The application should depend on **agent-level abstractions**, rather than provider-specific APIs wherever possible.
+At the architecture level, the important boundary is:
 
 ```text
 Agent
@@ -108,6 +97,8 @@ Agent
       ├── Native
       └── MCP
 ```
+
+The application depends on **agent-level abstractions**, not provider-specific APIs, wherever possible.
 
 ---
 
@@ -190,6 +181,8 @@ Agent
        └── MCP tool
 ```
 
+Tool execution details (error handling, native tool authoring) are covered in [AGENT.md](./AGENT.md).
+
 ---
 
 # 3. React / TypeScript UI
@@ -266,17 +259,20 @@ The provider can then hydrate its transient state from the loaded data.
 
 ## 3.4 Streaming
 
-AI execution is event-driven.
+AI execution is event-driven. The Rust agent emits a stream of typed events over a Tauri channel; React consumes them to build up a live view of the run, then reconciles with the persisted result once the run completes.
 
 ```text
 Rust Agent
     │
     ├── ThreadCreated
     ├── RunStarted
-    ├── MessageDelta ──────► React
+    ├── MessageStarted / MessageDelta* / MessageCompleted
+    ├── ToolCallStarted / ToolCallCompleted
     ├── RunCompleted ──────► React
     └── Error ─────────────► React
 ```
+
+The full event model and the message-identity strategy that lets the UI reconcile live state with persisted state are documented in [AGENT.md](./AGENT.md).
 
 The UI buffers deltas before rendering when necessary to avoid excessive visual updates.
 
@@ -312,3 +308,5 @@ The architecture should evolve around three clear boundaries:
 ```
 
 **React decides what the user sees. Rust decides what the application does. Storage decides what persists. The agent decides how AI work is executed.**
+
+See [AGENT.md](./AGENT.md) for how the agent boundary itself is structured.

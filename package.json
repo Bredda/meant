@@ -1,7 +1,12 @@
 {
   "name": "meant",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local-first AI workbench",
+  "homepage": "https://github.com/Bredda/Meant?tab=readme-ov-file",
+  "author": "Bredda <mangin.laurent@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/Bredda/Meant/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -31,7 +36,8 @@
     "react-router": "^7.10.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",

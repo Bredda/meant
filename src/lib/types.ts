@@ -1,3 +1,8 @@
+export type AppConfig = {
+  theme: "light" | "dark" | "system";
+}
+
+
 type BaseAgentEvent = {
   data: { run_id: string };
 };

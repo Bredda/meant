@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useUpdateConfig } from "@/hooks/use-config-update";
 
-type Theme = "dark" | "light" | "system";
+export type Theme = "dark" | "light" | "system";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -29,24 +30,30 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
+  const updateConfig = useUpdateConfig();
 
   useEffect(() => {
-    const root = window.document.documentElement;
+    const _saveTheme = async () => {
+      await updateConfig({ theme });
+      const root = window.document.documentElement;
 
-    root.classList.remove("light", "dark");
+      root.classList.remove("light", "dark");
 
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
+      if (theme === "system") {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+          .matches
+          ? "dark"
+          : "light";
 
-      root.classList.add(systemTheme);
-      return;
-    }
+        root.classList.add(systemTheme);
+        return;
+      }
 
-    root.classList.add(theme);
-  }, [theme]);
+      root.classList.add(theme);
+    };
+
+    _saveTheme();
+  }, [theme, updateConfig]);
 
   const value = {
     theme,

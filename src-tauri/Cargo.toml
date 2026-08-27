@@ -23,7 +23,12 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 uuid = { version = "1.25.0", features = ["v4"] }
 chrono = "0.4.45"
 async-trait = "0.1.92"
+toml = "1.1.4"
+thiserror = "2.0.20"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[dev-dependencies]
+tempfile = "3.27.0"

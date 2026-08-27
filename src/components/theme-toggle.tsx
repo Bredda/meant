@@ -1,5 +1,5 @@
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { type Theme, useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function ModeToggle() {
+export function ThemeToggle() {
   const { setTheme } = useTheme();
 
   return (
@@ -32,5 +32,47 @@ export function ModeToggle() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+type ThemeSelectProps = {
+  className?: string;
+};
+
+export function ThemeSelect({ className }: ThemeSelectProps) {
+  const { setTheme, theme } = useTheme();
+
+  return (
+    <Select onValueChange={(t) => setTheme(t as Theme)} value={theme}>
+      <SelectTrigger className={cn("w-[180px]", className)}>
+        <SelectValue placeholder="Theme" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectItem value="light">
+            <Sun />
+            Light
+          </SelectItem>
+          <SelectItem value="dark">
+            <Moon />
+            Dark
+          </SelectItem>
+          <SelectItem value="system">
+            <Monitor />
+            System
+          </SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   );
 }

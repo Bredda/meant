@@ -1,4 +1,10 @@
-import { BotMessageSquareIcon, Command, Home, SidebarIcon } from "lucide-react";
+import {
+  BotMessageSquareIcon,
+  Command,
+  Home,
+  Settings,
+  SidebarIcon,
+} from "lucide-react";
 import type React from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -16,6 +22,11 @@ const HEADER_MENUS: { title: string; to: string; icon: React.ReactNode }[] = [
     title: "Threads",
     to: "/threads",
     icon: <BotMessageSquareIcon />,
+  },
+  {
+    title: "Settings",
+    to: "/settings",
+    icon: <Settings />,
   },
 ];
 

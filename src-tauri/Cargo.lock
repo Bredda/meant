@@ -4818,6 +4818,9 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-process",
  "tauri-plugin-shell",
+ "tempfile",
+ "thiserror 2.0.20",
+ "toml 1.1.4+spec-1.1.0",
  "uuid",
 ]
 

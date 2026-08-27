@@ -23,6 +23,10 @@ const createAppRouter = () =>
           lazy: () => import("@/app/routes/thread"),
           loader: threadLoader,
         },
+        {
+          path: "/settings",
+          lazy: () => import("@/app/routes/settings"),
+        },
       ],
     },
 

@@ -259,7 +259,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
               role: "tool_call",
               tool_call_id,
               tool_name,
-              arguments: args,
+              content: args,
               position: livePositionRef.current++,
               thread_id: threadIdRef.current ?? "",
             });
