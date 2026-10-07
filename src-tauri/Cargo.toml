@@ -1,6 +1,6 @@
 [package]
 name = "meant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first AI workbench"
 authors = ["Bredda <mangin.laurent@gmail.com>"]
 edition = "2021"
