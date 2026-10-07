@@ -108,15 +108,12 @@ Storage is local and persistent.
 
 ### Relational state
 
-SQLite is the primary store for:
+SQLite (`meant.db` in the app data dir) holds threads, messages and runs, and is the place for future relational data (tool definitions, metadata). Schema changes go through versioned migrations (`src-tauri/src/db/migrations`, `PRAGMA user_version`).
 
-- Threads
-- Messages
-- Runs
-- Configuration
-- Metadata
-- Tool definitions
-- Application state
+### Files and secrets
+
+- Non-secret preferences live in `config.toml`, a human-readable file written atomically (see [config.md](./config.md)).
+- API keys live in the OS credential store, never in SQLite or in the config file.
 
 ### Vector state
 
@@ -194,15 +191,20 @@ React is responsible for **presentation and interaction**, not domain execution.
 React Router defines the application navigation model.
 
 ```text
-/threads
-    Thread list
+/
+    Home
 
-/threads/new
+/threads
     New thread composer
 
 /threads/:id
     Existing thread
+
+/settings
+    Preferences and API keys
 ```
+
+The thread list lives in the sidebar, loaded by the layout route and refreshed after each run.
 
 The route is the source of truth for the currently displayed thread.
 
