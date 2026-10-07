@@ -24,7 +24,6 @@ fn main() {
     }
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;

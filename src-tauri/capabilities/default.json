@@ -1,0 +1,7 @@
+{
+  "identifier": "default",
+  "description": "Permissions of the main window: core IPC and app relaunch.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": ["core:default", "process:default"]
+}
