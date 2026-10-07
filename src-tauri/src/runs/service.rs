@@ -5,14 +5,23 @@ use crate::ai::agent::{
 
 use serde::Serialize;
 
-// Only `Running` is used until runs are persisted (fixes.md R4).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RunStatus {
     Running,
     Completed,
     Failed,
+}
+
+impl RunStatus {
+    /// Value stored in `runs.status`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

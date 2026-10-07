@@ -14,12 +14,16 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
   └─ invoke("chat", { request: { threadId, input }, channel })
        commands/chat.rs
          ├─ resolve or create thread (emits ThreadCreated)
-         ├─ persist the user message
-         ├─ load history → Vec<ThreadMessage>
-         ├─ state.default_provider() → state.agent(provider)   (cached, built from the vault)
-         ├─ RunService::run → ReActAgent::run                  (streams events)
-         ├─ persist produced messages (assistant / tool_call / tool_result)
-         └─ emit RunCompleted { messages: persisted rows incl. the user message }
+         ├─ state.default_provider()                         (fails before anything is written)
+         ├─ threads.start_run → runs row `running`
+         ├─ execute_run:
+         │    ├─ persist the user message (with run_id)
+         │    ├─ load history → Vec<ThreadMessage>
+         │    ├─ state.agent(provider)                         (cached, built from the vault)
+         │    ├─ RunService::run → ReActAgent::run             (streams events)
+         │    ├─ threads.append_messages (one transaction)
+         │    └─ emit RunCompleted { messages: persisted rows incl. the user message }
+         └─ threads.finish_run → `completed` or `failed` + error
 ```
 
 ## Invariants (do not break)

@@ -80,6 +80,8 @@ type ThreadBaseMessage = {
   position: number;
   createdAt?: number;
   threadId: string;
+  /** Run that produced the row; absent on optimistic messages and old rows. */
+  runId?: string | null;
 };
 
 export type ThreadUserMessage = {

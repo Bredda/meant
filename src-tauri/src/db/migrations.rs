@@ -3,7 +3,10 @@ use rusqlite::Connection;
 /// Ordered schema migrations. The database's `PRAGMA user_version` is the
 /// number of migrations already applied; append new files, never edit or
 /// reorder an existing one (it has already run on users' machines).
-const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_init.sql"),
+    include_str!("migrations/0002_runs.sql"),
+];
 
 /// Applies every pending migration, each in its own transaction together with
 /// the `user_version` bump, so a failure leaves the database at the last

@@ -182,6 +182,7 @@ mod tests {
             position: 0,
             created_at: 0,
             thread_id: "t1".into(),
+            run_id: None,
             role: "tool_result".into(),
             content: content.into(),
             tool_call_id: Some("c1".into()),
