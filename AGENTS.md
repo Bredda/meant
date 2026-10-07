@@ -27,7 +27,7 @@ cargo fmt --check
 
 - **Before handing work back**, run `pnpm typecheck`, `pnpm check`, `pnpm test`, `cargo clippy --all-targets` and `cargo test`, and say which ones fail. They all pass on `main`: a failure is yours to fix or report.
 - **Formatting**: Biome only for TS/JSON/CSS (no Prettier); rustfmt for Rust (`src-tauri/rustfmt.toml`). A Claude Code hook (`.claude/hooks/format-file.mjs`) formats every file you write with the same tools. `src/components/ui` (shadcn-generated) is excluded from Biome on purpose.
-- **Git hooks** (Husky): `pre-commit` runs lint-staged (ultracite fix on staged files); `pre-push` runs typecheck, Biome, Vitest, clippy and cargo test. Fix the cause of a failing hook, never `--no-verify`.
+- **Git hooks** (Husky): `pre-commit` runs lint-staged (ultracite fix on staged files); `commit-msg` runs commitlint (Conventional Commits, because release tooling reads them); `pre-push` runs typecheck, Biome, `cargo fmt --check` and clippy, no tests (CI runs those). Fix the cause of a failing hook, never `--no-verify`.
 - **CI** (`.github/workflows/ci.yml`, push to `main` and pull requests) runs the same checks plus `cargo fmt --check` and `pnpm build` on Ubuntu.
 - **Tests**: Rust tests live in `#[cfg(test)]` modules next to the code and stay hermetic (use `vault::mock::InMemoryStore`, `tempfile`, in-memory SQLite; never the real keyring or a provider). Frontend tests use Vitest (`pnpm test`), colocated `*.test.ts`, for pure logic only (no DOM, no `invoke`). UI flows need the real app: say what you could not exercise.
 
