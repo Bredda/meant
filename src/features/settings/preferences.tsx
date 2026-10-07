@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUpdateConfig } from "@/hooks/use-config-update";
+import { errorMessage } from "@/lib/errors";
 import { type PreferencesValues, preferencesSchema } from "@/lib/schemas";
 import { useConfigStore } from "@/stores/config-store";
 
@@ -49,7 +50,7 @@ export function PreferencesForm() {
         toast.success("Preferences saved");
       } catch (_error) {
         console.error(_error);
-        setBackError(_error as unknown as string);
+        setBackError(errorMessage(_error));
       }
     },
   });

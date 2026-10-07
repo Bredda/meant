@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRevalidator } from "react-router";
+import { useNavigate, useRevalidator } from "react-router";
+import { toast } from "sonner";
 import { useTextBuffer } from "@/hooks/use-text-buffer";
+import { type AppErrorKind, errorKind, errorMessage } from "@/lib/errors";
 import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
 import { isRunDisplayed, type RunAction, runReducer } from "./run-reducer";
 import { getThread } from "./thread-loader";
@@ -40,6 +42,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
   // Refreshes route loaders (the sidebar list is ordered by last activity).
   const { revalidate } = useRevalidator();
+  const navigate = useNavigate();
 
   /*
    * Refs = run technical state.
@@ -107,8 +110,19 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleError = useCallback(
-    (message: string, runThreadId: string | null) => {
+    (message: string, runThreadId: string | null, kind: AppErrorKind) => {
       textBuffer.stop(true);
+
+      if (kind === "provider") {
+        // Only the user's click navigates: the provider itself never does.
+        toast.error("The AI provider could not answer", {
+          description: "Check your API key in Settings.",
+          action: {
+            label: "Open Settings",
+            onClick: () => navigate("/settings"),
+          },
+        });
+      }
 
       const fallbackId = crypto.randomUUID();
       const warningId = currentAssistantMessageIdRef.current ?? fallbackId;
@@ -146,7 +160,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           console.error("Could not reload thread after a failed run", error);
         });
     },
-    [dispatch, endRun, textBuffer]
+    [dispatch, endRun, navigate, textBuffer]
   );
 
   /**
@@ -337,7 +351,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "Error": {
-            handleError(event.data.message, runThreadId);
+            handleError(event.data.message, runThreadId, event.data.kind);
             break;
           }
 
@@ -365,10 +379,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           endRun();
           return;
         }
-        handleError(
-          error instanceof Error ? error.message : String(error),
-          runThreadId
-        );
+        handleError(errorMessage(error), runThreadId, errorKind(error));
       }
     },
     [

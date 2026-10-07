@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { ProviderId } from "@/config/providers";
+import { errorMessage } from "@/lib/errors";
 
 export type SecretStatus = {
   provider: ProviderId;
@@ -22,7 +23,7 @@ export function useSecrets() {
       setStatuses(await invoke<SecretStatus[]>("list_secrets"));
       setError(null);
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err));
     }
   }, []);
 

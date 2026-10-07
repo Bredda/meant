@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::{
     ai::agent::runtime::AgentError,
     db::models::{StoredThreadMessage, Thread},
+    error::ErrorKind,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -55,6 +56,7 @@ pub enum AgentEvent {
     Error {
         thread_id: Option<String>,
         run_id: String,
+        kind: ErrorKind,
         message: String,
     },
 }

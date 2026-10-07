@@ -89,9 +89,7 @@ impl AgentRuntime for ReActAgent {
                 Ok(item) => item,
                 // RunService reports the failure to the UI; emitting here too
                 // would show the same error twice.
-                Err(e) => {
-                    return Err(AgentError::Runtime(e.to_string()));
-                }
+                Err(e) => return Err(stream_error(e)),
             };
 
             match item {
@@ -237,6 +235,22 @@ fn tool_result_text(content: &[ToolResultContent]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// A failed completion means the provider could not be used (rejected key,
+/// network, rate limit): the UI points the user to Settings for those.
+fn stream_error(error: rig::agent::StreamingError) -> AgentError {
+    use rig::{agent::StreamingError, completion::PromptError};
+
+    match error {
+        StreamingError::Completion(_) => AgentError::Provider(error.to_string()),
+        StreamingError::Prompt(ref prompt)
+            if matches!(**prompt, PromptError::CompletionError(_)) =>
+        {
+            AgentError::Provider(error.to_string())
+        }
+        StreamingError::Prompt(_) => AgentError::Runtime(error.to_string()),
+    }
 }
 
 #[cfg(test)]

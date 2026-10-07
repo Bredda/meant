@@ -5,6 +5,7 @@ mod ai;
 mod commands;
 mod config;
 mod db;
+mod error;
 mod runs;
 mod state;
 mod storage;

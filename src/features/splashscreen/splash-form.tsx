@@ -33,6 +33,7 @@ import {
 import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "@/config/providers";
 import { useUpdateConfig } from "@/hooks/use-config-update";
 import { storeSecret } from "@/hooks/use-secrets";
+import { errorMessage } from "@/lib/errors";
 import type { AppConfig } from "@/lib/types";
 
 const formSchema = z
@@ -125,7 +126,7 @@ export function SplashForm({ onComplete }: SplashFormProps) {
         onComplete(config);
       } catch (error) {
         console.error(error);
-        setBackError(String(error));
+        setBackError(errorMessage(error));
       }
     },
   });

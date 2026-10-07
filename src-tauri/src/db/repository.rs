@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::db::{migrations, models::StoredThreadMessage};
+use crate::db::{error::DbError, migrations, models::StoredThreadMessage};
 
 use super::models::Thread;
 
@@ -12,37 +12,31 @@ pub struct ThreadRepository {
 }
 
 impl ThreadRepository {
-    pub fn new(path: &Path) -> Result<Self, String> {
-        let connection = Connection::open(path.join("meant.db")).map_err(|e| e.to_string())?;
+    pub fn new(path: &Path) -> Result<Self, DbError> {
+        let connection = Connection::open(path.join("meant.db"))?;
         Self::from_connection(connection)
     }
 
     /// Prepares any connection (a file, or an in-memory database in tests).
-    pub fn from_connection(mut connection: Connection) -> Result<Self, String> {
+    pub fn from_connection(mut connection: Connection) -> Result<Self, DbError> {
         // Per-connection setting, not part of the schema.
-        connection
-            .pragma_update(None, "foreign_keys", true)
-            .map_err(|e| e.to_string())?;
-        migrations::migrate(&mut connection).map_err(|e| e.to_string())?;
+        connection.pragma_update(None, "foreign_keys", true)?;
+        migrations::migrate(&mut connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
         })
     }
 
-    pub fn create_thread(&self) -> Result<Thread, String> {
+    pub fn create_thread(&self) -> Result<Thread, DbError> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp();
         let title = "New thread".to_string();
 
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "Database mutex poisoned".to_string())?;
+        let connection = self.connection.lock().map_err(|_| DbError::Poisoned)?;
 
-        connection
-            .execute(
-                r#"
+        connection.execute(
+            r#"
                 INSERT INTO threads (
                     id,
                     title,
@@ -51,9 +45,8 @@ impl ThreadRepository {
                 )
                 VALUES (?1, ?2, ?3, ?4)
                 "#,
-                params![id, title, now, now],
-            )
-            .map_err(|e| e.to_string())?;
+            params![id, title, now, now],
+        )?;
 
         Ok(Thread {
             id,
@@ -63,15 +56,11 @@ impl ThreadRepository {
         })
     }
 
-    pub fn get_thread(&self, thread_id: &str) -> Result<Option<Thread>, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "Database mutex poisoned".to_string())?;
+    pub fn get_thread(&self, thread_id: &str) -> Result<Option<Thread>, DbError> {
+        let connection = self.connection.lock().map_err(|_| DbError::Poisoned)?;
 
-        let mut statement = connection
-            .prepare(
-                r#"
+        let mut statement = connection.prepare(
+            r#"
                 SELECT
                     id,
                     title,
@@ -80,8 +69,7 @@ impl ThreadRepository {
                 FROM threads
                 WHERE id = ?1
                 "#,
-            )
-            .map_err(|e| e.to_string())?;
+        )?;
 
         statement
             .query_row(params![thread_id], |row| {
@@ -93,7 +81,7 @@ impl ThreadRepository {
                 })
             })
             .optional()
-            .map_err(|e| e.to_string())
+            .map_err(DbError::from)
     }
 
     pub fn add_message(
@@ -104,29 +92,23 @@ impl ThreadRepository {
         content: &str,
         tool_call_id: Option<&str>,
         tool_name: Option<&str>,
-    ) -> Result<StoredThreadMessage, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "Database mutex poisoned".to_string())?;
+    ) -> Result<StoredThreadMessage, DbError> {
+        let connection = self.connection.lock().map_err(|_| DbError::Poisoned)?;
 
-        let position: i64 = connection
-            .query_row(
-                r#"
+        let position: i64 = connection.query_row(
+            r#"
                 SELECT COALESCE(MAX(position), -1) + 1
                 FROM messages
                 WHERE thread_id = ?1
                 "#,
-                params![thread_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
+            params![thread_id],
+            |row| row.get(0),
+        )?;
 
         let now = chrono::Utc::now().timestamp();
 
-        connection
-            .execute(
-                r#"
+        connection.execute(
+            r#"
                 INSERT INTO messages (
                     id,
                     thread_id,
@@ -139,29 +121,26 @@ impl ThreadRepository {
                 )
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                 "#,
-                params![
-                    id,
-                    thread_id,
-                    role,
-                    content,
-                    tool_call_id,
-                    tool_name,
-                    position,
-                    now
-                ],
-            )
-            .map_err(|e| e.to_string())?;
+            params![
+                id,
+                thread_id,
+                role,
+                content,
+                tool_call_id,
+                tool_name,
+                position,
+                now
+            ],
+        )?;
 
-        connection
-            .execute(
-                r#"
+        connection.execute(
+            r#"
                 UPDATE threads
                 SET updated_at = ?1
                 WHERE id = ?2
                 "#,
-                params![now, thread_id],
-            )
-            .map_err(|e| e.to_string())?;
+            params![now, thread_id],
+        )?;
 
         Ok(StoredThreadMessage {
             id: id.to_string(),
@@ -175,15 +154,11 @@ impl ThreadRepository {
         })
     }
 
-    pub fn get_messages(&self, thread_id: &str) -> Result<Vec<StoredThreadMessage>, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "Database mutex poisoned".to_string())?;
+    pub fn get_messages(&self, thread_id: &str) -> Result<Vec<StoredThreadMessage>, DbError> {
+        let connection = self.connection.lock().map_err(|_| DbError::Poisoned)?;
 
-        let mut statement = connection
-            .prepare(
-                r#"
+        let mut statement = connection.prepare(
+            r#"
                 SELECT
                     id,
                     thread_id,
@@ -197,37 +172,29 @@ impl ThreadRepository {
                 WHERE thread_id = ?1
                 ORDER BY position ASC
                 "#,
-            )
-            .map_err(|e| e.to_string())?;
+        )?;
 
-        let rows = statement
-            .query_map(params![thread_id], |row| {
-                Ok(StoredThreadMessage {
-                    id: row.get(0)?,
-                    thread_id: row.get(1)?,
-                    role: row.get(2)?,
-                    content: row.get(3)?,
-                    tool_call_id: row.get(4)?,
-                    tool_name: row.get(5)?,
-                    position: row.get(6)?,
-                    created_at: row.get(7)?,
-                })
+        let rows = statement.query_map(params![thread_id], |row| {
+            Ok(StoredThreadMessage {
+                id: row.get(0)?,
+                thread_id: row.get(1)?,
+                role: row.get(2)?,
+                content: row.get(3)?,
+                tool_call_id: row.get(4)?,
+                tool_name: row.get(5)?,
+                position: row.get(6)?,
+                created_at: row.get(7)?,
             })
-            .map_err(|e| e.to_string())?;
+        })?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub fn list_threads(&self) -> Result<Vec<Thread>, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "Database mutex poisoned".to_string())?;
+    pub fn list_threads(&self) -> Result<Vec<Thread>, DbError> {
+        let connection = self.connection.lock().map_err(|_| DbError::Poisoned)?;
 
-        let mut statement = connection
-            .prepare(
-                r#"
+        let mut statement = connection.prepare(
+            r#"
                 SELECT
                     id,
                     title,
@@ -236,21 +203,17 @@ impl ThreadRepository {
                 FROM threads
                 ORDER BY updated_at DESC
                 "#,
-            )
-            .map_err(|e| e.to_string())?;
+        )?;
 
-        let rows = statement
-            .query_map([], |row| {
-                Ok(Thread {
-                    id: row.get(0)?,
-                    title: row.get(1)?,
-                    created_at: row.get(2)?,
-                    updated_at: row.get(3)?,
-                })
+        let rows = statement.query_map([], |row| {
+            Ok(Thread {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                created_at: row.get(2)?,
+                updated_at: row.get(3)?,
             })
-            .map_err(|e| e.to_string())?;
+        })?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 }

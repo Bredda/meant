@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::{config::AppConfig, state::AppState, storage::error::StoreError};
+use crate::{config::AppConfig, error::AppError, state::AppState};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct UpdateConfigRequest {
@@ -12,13 +12,13 @@ pub struct UpdateConfigRequest {
 pub async fn update_config(
     state: State<'_, AppState>,
     request: UpdateConfigRequest,
-) -> Result<AppConfig, StoreError> {
-    state.config_store.update(move |config| {
+) -> Result<AppConfig, AppError> {
+    Ok(state.config_store.update(move |config| {
         if let Some(theme) = request.theme {
             config.theme = theme;
         }
         if let Some(username) = request.username {
             config.username = username;
         }
-    })
+    })?)
 }

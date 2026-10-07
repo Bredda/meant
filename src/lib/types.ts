@@ -1,3 +1,4 @@
+import type { AppErrorKind } from "./errors";
 export type AppConfig = {
   theme: "light" | "dark" | "system";
   username: string;
@@ -60,7 +61,7 @@ export type RunCompletedEvent = {
 
 export type ErrorEvent = {
   type: "Error";
-  data: { thread_id?: string; message: string };
+  data: { thread_id?: string; kind: AppErrorKind; message: string };
 } & BaseAgentEvent;
 
 export type AgentEvent =

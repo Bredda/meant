@@ -53,6 +53,7 @@ where
                 emit(AgentEvent::Error {
                     run_id: run.id.clone(),
                     thread_id: Some(run.thread_id.clone()),
+                    kind: error.kind(),
                     message: error.to_string(),
                 });
                 Err(error)

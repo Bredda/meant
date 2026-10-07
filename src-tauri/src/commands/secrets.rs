@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::error::AppError;
 use crate::state::AppState;
 use crate::vault::error::VaultError;
 use crate::vault::secrets::{ProviderId, SecretStatus};
@@ -12,7 +13,7 @@ use crate::vault::SecretStore;
 /// material never crosses the IPC boundary — there is deliberately no command
 /// that reads a secret back out.
 #[tauri::command]
-pub fn list_secrets(state: State<'_, AppState>) -> Result<Vec<SecretStatus>, VaultError> {
+pub fn list_secrets(state: State<'_, AppState>) -> Result<Vec<SecretStatus>, AppError> {
     ProviderId::ALL
         .iter()
         .map(|&provider| {
@@ -33,13 +34,13 @@ pub struct SetSecretRequest {
 pub async fn set_secret(
     state: State<'_, AppState>,
     request: SetSecretRequest,
-) -> Result<(), VaultError> {
+) -> Result<(), AppError> {
     let value = request.value.trim();
 
     if !request.provider.accepts(value) {
-        return Err(VaultError::InvalidFormat(
+        return Err(AppError::from(VaultError::InvalidFormat(
             request.provider.label().to_string(),
-        ));
+        )));
     }
 
     state
@@ -62,7 +63,7 @@ pub struct DeleteSecretRequest {
 pub async fn delete_secret(
     state: State<'_, AppState>,
     request: DeleteSecretRequest,
-) -> Result<(), VaultError> {
+) -> Result<(), AppError> {
     // Setup requires at least one provider; enforce that invariant here too,
     // so the app can never be driven into a keyless state from /settings.
     let has_another = ProviderId::ALL
@@ -74,7 +75,7 @@ pub async fn delete_secret(
         .any(|secret| secret.is_some());
 
     if !has_another {
-        return Err(VaultError::LastProvider);
+        return Err(VaultError::LastProvider.into());
     }
 
     state.vault.delete_secret(request.provider.secret_key())?;

@@ -3,6 +3,7 @@ use tauri::{ipc::Channel, State};
 use crate::{
     ai::agent::types::{AgentEvent, ThreadMessage},
     db::models::StoredThreadMessage,
+    error::AppError,
     runs::service::{Run, RunStatus},
     AppState,
 };
@@ -19,7 +20,7 @@ pub async fn chat(
     state: State<'_, AppState>,
     request: ChatRequest,
     channel: Channel<AgentEvent>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let run_id = uuid::Uuid::new_v4().to_string();
 
     // Retrieves or creates thread based on optional request thread_id
@@ -27,17 +28,15 @@ pub async fn chat(
         Some(thread_id) => state
             .threads
             .get_thread(&thread_id)?
-            .ok_or_else(|| format!("Thread not found: {thread_id}"))?,
+            .ok_or_else(|| AppError::NotFound(format!("Thread {thread_id}")))?,
 
         None => {
             let thread = state.threads.create_thread()?;
 
-            channel
-                .send(AgentEvent::ThreadCreated {
-                    thread: thread.clone(),
-                    run_id: run_id.clone(),
-                })
-                .map_err(|e| e.to_string())?;
+            channel.send(AgentEvent::ThreadCreated {
+                thread: thread.clone(),
+                run_id: run_id.clone(),
+            })?;
 
             thread
         }
@@ -100,13 +99,11 @@ pub async fn chat(
     }
 
     // Emit final event with all persisted messages
-    channel
-        .send(AgentEvent::RunCompleted {
-            thread_id: thread.id.clone(),
-            run_id: run_id.clone(),
-            messages: persisted_messages,
-        })
-        .map_err(|e| e.to_string())?;
+    channel.send(AgentEvent::RunCompleted {
+        thread_id: thread.id.clone(),
+        run_id: run_id.clone(),
+        messages: persisted_messages,
+    })?;
 
     Ok(())
 }
@@ -117,7 +114,7 @@ fn persist_thread_message(
     state: &State<'_, AppState>,
     thread_id: &str,
     message: ThreadMessage,
-) -> Result<Option<StoredThreadMessage>, String> {
+) -> Result<Option<StoredThreadMessage>, AppError> {
     let (id, role, content, tool_call_id, tool_name) = match message {
         ThreadMessage::Assistant { id, content } => (id, "assistant", content, None, None),
 
@@ -129,7 +126,7 @@ fn persist_thread_message(
         } => (
             id,
             "tool_call",
-            serde_json::to_string(&arguments).map_err(|e| e.to_string())?,
+            serde_json::to_string(&arguments)?,
             Some(tool_call_id),
             Some(tool_name),
         ),

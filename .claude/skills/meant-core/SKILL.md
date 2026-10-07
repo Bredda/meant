@@ -10,7 +10,7 @@ Read `reference/ARCHITECTURE.md` and `reference/config.md` for the why. This ski
 ## Adding or changing a Tauri command
 
 1. Put it in `src-tauri/src/commands/<area>.rs` (one area per file; add `pub mod` in `commands/mod.rs`).
-2. Request payloads are a `#[derive(Deserialize)] #[serde(rename_all = "camelCase")]` struct passed as a single `request` argument. Every field the UI may omit must be `Option<T>` or `#[serde(default)]`: a missing non-optional field rejects the whole call.
+2. Return `Result<T, AppError>`. Request payloads are a `#[derive(Deserialize)] #[serde(rename_all = "camelCase")]` struct passed as a single `request` argument. Every field the UI may omit must be `Option<T>` or `#[serde(default)]`: a missing non-optional field rejects the whole call.
 3. Register it in the `generate_handler![...]` list in `main.rs`.
 4. Mirror it on the TS side in the same change: types in `src/lib/types.ts`, the `invoke` call in a hook under `src/hooks/` (or the feature's loader), never inline in a component.
 5. Commands stay thin: validate input, call the domain (`state.threads`, `state.config_store`, `state.vault`, `state.agent(...)`), map the error. No SQL, no provider calls, no business rules in the command body.
@@ -18,9 +18,10 @@ Read `reference/ARCHITECTURE.md` and `reference/config.md` for the why. This ski
 
 ## Errors
 
-- Domain modules own a `thiserror` enum (`StoreError`, `VaultError`). Implement `serde::Serialize` as `serialize_str(&self.to_string())` so the UI receives a readable message (see `storage/error.rs`).
-- Messages are user-facing when they can reach the UI: say what to do ("Add a key in Settings"), never include a secret.
-- The db layer still returns `Result<_, String>` and `DbError` is unused: the planned migration is in `fixes.md`. Do not add new `String` errors.
+- Every command returns `Result<T, AppError>` (`src-tauri/src/error.rs`). It serializes to `{ kind, message }`; the TS mirror is `src/lib/errors.ts` (`errorMessage`, `errorKind`). Never stringify a rejection with `String(err)` in the UI.
+- Domain modules own a `thiserror` enum (`DbError`, `StoreError`, `VaultError`, `AgentError`) with a `#[from]` conversion into `AppError`; add the mapping to `AppError::kind()` when a new variant needs a specific UI reaction (`provider` points to Settings, `invalidInput` is shown on the field).
+- A run failure carries the same `kind` in `AgentEvent::Error`. Stream errors from a failed completion are `AgentError::Provider` (see `stream_error` in `react.rs`).
+- Messages are user-facing: say what to do ("Add a key in Settings"), never include a secret.
 - No `unwrap()`/`expect()` outside tests and the `setup` closure.
 
 ## State (`state.rs`)
