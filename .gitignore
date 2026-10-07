@@ -53,3 +53,5 @@ pids
 .idea
 debug.log
 .aider*
+# Claude Code personal settings
+.claude/settings.local.json

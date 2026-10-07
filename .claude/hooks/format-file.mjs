@@ -17,7 +17,7 @@ try {
 } catch {
   process.exit(0);
 }
-if (!filePath || !existsSync(filePath)) {
+if (!(filePath && existsSync(filePath))) {
   process.exit(0);
 }
 
@@ -30,18 +30,41 @@ const ext = extname(filePath).toLowerCase();
 const shell = process.platform === "win32";
 
 try {
-  if ([".ts", ".tsx", ".js", ".jsx", ".mjs", ".json", ".jsonc", ".css"].includes(ext)) {
+  if (
+    [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json", ".jsonc", ".css"].includes(
+      ext
+    )
+  ) {
     execFileSync(
       "pnpm",
-      ["exec", "biome", "check", "--write", "--no-errors-on-unmatched", "--files-ignore-unknown=true", filePath],
+      [
+        "exec",
+        "biome",
+        "check",
+        "--write",
+        "--no-errors-on-unmatched",
+        "--files-ignore-unknown=true",
+        filePath,
+      ],
       { cwd: root, stdio: "pipe", shell }
     );
-  } else if (ext === ".rs" && existsSync(join(root, "src-tauri", "rustfmt.toml"))) {
-    execFileSync("rustfmt", ["--edition", "2021", filePath], { cwd: join(root, "src-tauri"), stdio: "pipe", shell });
+  } else if (
+    ext === ".rs" &&
+    existsSync(join(root, "src-tauri", "rustfmt.toml"))
+  ) {
+    execFileSync("rustfmt", ["--edition", "2021", filePath], {
+      cwd: join(root, "src-tauri"),
+      stdio: "pipe",
+      shell,
+    });
   }
 } catch (error) {
   // Lint errors Biome cannot fix land here: surface them to Claude without blocking.
-  const output = `${error.stdout ?? ""}${error.stderr ?? ""}`.trim().split("\n").slice(-20).join("\n");
+  const output = `${error.stdout ?? ""}${error.stderr ?? ""}`
+    .trim()
+    .split("\n")
+    .slice(-20)
+    .join("\n");
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
