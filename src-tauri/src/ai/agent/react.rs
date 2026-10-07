@@ -87,12 +87,9 @@ impl AgentRuntime for ReActAgent {
         while let Some(item) = stream.next().await {
             let item = match item {
                 Ok(item) => item,
+                // RunService reports the failure to the UI; emitting here too
+                // would show the same error twice.
                 Err(e) => {
-                    emit(AgentEvent::Error {
-                        run_id: run.id.clone(),
-                        thread_id: Some(run.thread_id.clone()),
-                        message: e.to_string(),
-                    });
                     return Err(AgentError::Runtime(e.to_string()));
                 }
             };

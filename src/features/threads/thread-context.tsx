@@ -322,6 +322,12 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           channel,
         });
       } catch (error) {
+        // A run failure arrives twice: as an Error event, then as this
+        // rejection. Only failures before the run started (no provider,
+        // unknown thread) have no event, and the run is still active then.
+        if (!activeRunRef.current) {
+          return;
+        }
         handleError(error instanceof Error ? error.message : String(error));
       }
     },
