@@ -34,7 +34,7 @@ export function groupMessages(messages: ThreadMessage[]): RenderItem[] {
         const index = toolItemIndexByCallId.get(message.tool_call_id);
         const existing = index === undefined ? undefined : items[index];
 
-        if (existing?.kind === "tool" && index) {
+        if (existing?.kind === "tool" && index !== undefined) {
           items[index] = { ...existing, result: message };
         }
         // We should not have a tool_result without its corresponding tool_call

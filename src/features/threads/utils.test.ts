@@ -66,3 +66,13 @@ describe("groupMessages", () => {
     expect(items).toHaveLength(1);
   });
 });
+
+describe("groupMessages with a tool call first", () => {
+  it("attaches the result when the call is the first item", () => {
+    const items = groupMessages([call("c1"), result("c1")]);
+    const tool = items[0];
+
+    expect(items).toHaveLength(1);
+    expect(tool?.kind === "tool" && tool.result?.content).toBe('"ok"');
+  });
+});
