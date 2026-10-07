@@ -1,7 +1,7 @@
 import { BotIcon } from "lucide-react";
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Clipboardbutton } from "@/components/clipboard-button";
+import { ClipboardButton } from "@/components/clipboard-button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Message,
@@ -37,9 +37,8 @@ export function AssistantMessage({
             copied && "opacity-100"
           )}
         >
-          <Clipboardbutton
+          <ClipboardButton
             content={message.content}
-            copied={copied}
             onCopiedChanged={setCopied}
           />
         </MessageFooter>

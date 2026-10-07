@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Clipboardbutton } from "@/components/clipboard-button";
+import { ClipboardButton } from "@/components/clipboard-button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
@@ -38,9 +38,8 @@ export function UserMessage({ message }: { message: ThreadUserMessage }) {
             copied && "opacity-100"
           )}
         >
-          <Clipboardbutton
+          <ClipboardButton
             content={message.content}
-            copied={copied}
             onCopiedChanged={setCopied}
           />
         </MessageFooter>

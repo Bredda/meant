@@ -37,7 +37,6 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat,
-            commands::get_thread_messages::get_thread_messages,
             commands::list_threads::list_threads,
             commands::get_thread::get_thread,
             commands::update_config::update_config,
