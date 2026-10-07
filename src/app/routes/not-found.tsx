@@ -19,12 +19,6 @@ export default function NotFoundErrorPage() {
         <Button onClick={() => navigate(-1)} size="lg">
           Go back
         </Button>
-        <Button size="lg" variant="ghost">
-          Contact support{" "}
-          <span aria-hidden="true" className="ml-1">
-            &rarr;
-          </span>
-        </Button>
       </ErrorActions>
     </ErrorView>
   );

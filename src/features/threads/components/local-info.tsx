@@ -41,18 +41,6 @@ export function LocalInfos({ thread }: { thread: Thread }) {
               {(copied) => (copied ? "copied" : thread.id)}
             </ClipboardButton>
           </div>
-          <div className="flex w-full items-center gap-2">
-            <span className="max-w-[80px] text-muted-foreground text-sm">
-              Path
-            </span>
-            <ClipboardButton
-              className="flex-1"
-              content="to be done"
-              variant="secondary"
-            >
-              {(copied) => (copied ? "copied" : "to be done")}
-            </ClipboardButton>
-          </div>
         </div>
       </PopoverContent>
     </Popover>

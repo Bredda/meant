@@ -100,7 +100,7 @@ export function PreferencesForm() {
                         name={field.name}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="shadcn"
+                        placeholder="your_name"
                         value={field.state.value}
                       />
                     </Field>
@@ -118,7 +118,7 @@ export function PreferencesForm() {
                       <FieldContent>
                         <FieldLabel htmlFor="select-theme">Theme</FieldLabel>
                         <FieldDescription>
-                          Select your prefered theme.
+                          Select your preferred theme.
                         </FieldDescription>
                         {isInvalid && (
                           <FieldError errors={field.state.meta.errors} />
