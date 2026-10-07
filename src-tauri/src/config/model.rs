@@ -5,8 +5,7 @@ pub struct AppConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_username")]
-    pub username: String
-    // future non-secret preferences go here
+    pub username: String, // future non-secret preferences go here
 }
 
 fn default_theme() -> String {

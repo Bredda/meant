@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use std::path::Path;
+use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -14,8 +14,7 @@ pub struct ThreadRepository {
 impl ThreadRepository {
     pub fn new(path: &Path) -> Result<Self, String> {
         let database_path = path.join("meant.db");
-        let connection =
-            Connection::open(database_path).map_err(|e| e.to_string())?;
+        let connection = Connection::open(database_path).map_err(|e| e.to_string())?;
 
         connection
             .execute_batch(
@@ -88,10 +87,7 @@ impl ThreadRepository {
         })
     }
 
-    pub fn get_thread(
-        &self,
-        thread_id: &str,
-    ) -> Result<Option<Thread>, String> {
+    pub fn get_thread(&self, thread_id: &str) -> Result<Option<Thread>, String> {
         let connection = self
             .connection
             .lock()
@@ -203,10 +199,7 @@ impl ThreadRepository {
         })
     }
 
-    pub fn get_messages(
-        &self,
-        thread_id: &str,
-    ) -> Result<Vec<StoredThreadMessage>, String> {
+    pub fn get_messages(&self, thread_id: &str) -> Result<Vec<StoredThreadMessage>, String> {
         let connection = self
             .connection
             .lock()

@@ -1,8 +1,8 @@
-use tauri::{State};
 use serde::Serialize;
+use tauri::State;
 
 use crate::{
-    db::models::{Thread, StoredThreadMessage},
+    db::models::{StoredThreadMessage, Thread},
     AppState,
 };
 
@@ -14,21 +14,13 @@ pub struct ThreadData {
 }
 
 #[tauri::command]
-pub fn get_thread(
-    state: State<'_, AppState>,
-    thread_id: String,
-) -> Result<ThreadData, String> {
+pub fn get_thread(state: State<'_, AppState>, thread_id: String) -> Result<ThreadData, String> {
     let thread = state
         .threads
         .get_thread(&thread_id)?
         .ok_or_else(|| format!("Thread not found: {thread_id}"))?;
 
-    let messages = state
-        .threads
-        .get_messages(&thread_id)?;
+    let messages = state.threads.get_messages(&thread_id)?;
 
-    Ok(ThreadData {
-        thread,
-        messages,
-    })
+    Ok(ThreadData { thread, messages })
 }

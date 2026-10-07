@@ -4,7 +4,6 @@ use crate::ai::agent::types::{AgentEvent, ThreadMessage};
 
 use crate::runs::service::Run;
 
-
 #[derive(Debug, Clone)]
 pub struct AgentContext {
     pub messages: Vec<ThreadMessage>,
@@ -12,7 +11,7 @@ pub struct AgentContext {
 
 #[derive(Debug, Clone)]
 pub struct RunResult {
-     pub messages: Vec<ThreadMessage>,
+    pub messages: Vec<ThreadMessage>,
 }
 
 #[derive(Debug)]
@@ -39,10 +38,7 @@ impl From<AgentError> for String {
 }
 
 impl std::fmt::Display for AgentError {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidContext(message) => {
                 write!(f, "Invalid context: {message}")
@@ -61,13 +57,10 @@ impl std::fmt::Display for AgentError {
 
 impl std::error::Error for AgentError {}
 
-pub type AgentEmitter =
-    Box<dyn Fn(AgentEvent) + Send + Sync>;
+pub type AgentEmitter = Box<dyn Fn(AgentEvent) + Send + Sync>;
 
 #[async_trait]
-pub trait AgentRuntime:
-    Send + Sync
-{
+pub trait AgentRuntime: Send + Sync {
     async fn run(
         &self,
         run: &Run,

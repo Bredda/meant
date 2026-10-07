@@ -1,8 +1,7 @@
 use crate::ai::agent::{
-        runtime::{
-            AgentContext, AgentEmitter, AgentError,  AgentRuntime, RunResult,
-        }, types::{AgentEvent, ThreadMessage},
-    };
+    runtime::{AgentContext, AgentEmitter, AgentError, AgentRuntime, RunResult},
+    types::{AgentEvent, ThreadMessage},
+};
 
 use serde::Serialize;
 
@@ -40,15 +39,9 @@ where
         messages: Vec<ThreadMessage>,
         emit: AgentEmitter,
     ) -> Result<RunResult, AgentError> {
-        let context = AgentContext {
-            messages,
-        };
+        let context = AgentContext { messages };
 
-        match self
-            .agent
-            .run(&run, context, &emit)
-            .await
-        {
+        match self.agent.run(&run, context, &emit).await {
             Ok(result) => Ok(result),
 
             Err(error) => {
@@ -57,11 +50,11 @@ where
                     thread_id: Some(run.thread_id.clone()),
                     message: error.to_string(),
                 });
-                return Err(AgentError::Runtime(
-                    format!("Unexpected error: {}!", error.to_string())
-                ));
+                return Err(AgentError::Runtime(format!(
+                    "Unexpected error: {}!",
+                    error.to_string()
+                )));
             }
         }
     }
-    
 }

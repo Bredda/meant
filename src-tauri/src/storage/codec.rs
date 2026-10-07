@@ -1,5 +1,5 @@
-use serde::{de::DeserializeOwned, Serialize};
 use crate::storage::error::StoreError;
+use serde::{de::DeserializeOwned, Serialize};
 use std::path::{Path, PathBuf};
 
 pub trait Codec {

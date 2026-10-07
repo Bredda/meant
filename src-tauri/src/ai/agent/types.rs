@@ -1,18 +1,20 @@
 use serde::Serialize;
 
-use crate::{ai::agent::runtime::AgentError, db::models::{StoredThreadMessage, Thread}};
-
+use crate::{
+    ai::agent::runtime::AgentError,
+    db::models::{StoredThreadMessage, Thread},
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", content = "data")]
 pub enum AgentEvent {
     ThreadCreated {
         thread: Thread,
-        run_id: String
+        run_id: String,
     },
     RunStarted {
         thread_id: String,
-        run_id: String
+        run_id: String,
     },
     MessageStarted {
         thread_id: String,
@@ -32,14 +34,14 @@ pub enum AgentEvent {
     },
     ToolCallStarted {
         thread_id: String,
-        run_id: String, 
+        run_id: String,
         tool_call_id: String,
         tool_name: String,
-        arguments: String
+        arguments: String,
     },
     ToolCallCompleted {
         thread_id: String,
-        run_id: String, 
+        run_id: String,
         tool_call_id: String,
         tool_name: String,
         content: String,
@@ -93,11 +95,9 @@ pub enum ThreadMessage {
 impl ThreadMessage {
     pub fn content(&self) -> &str {
         match self {
-            Self::User { content, .. }
-            | Self::Assistant { content, .. } => content,
+            Self::User { content, .. } | Self::Assistant { content, .. } => content,
 
-            Self::ToolCall { .. }
-            | Self::ToolResult { .. } => "",
+            Self::ToolCall { .. } | Self::ToolResult { .. } => "",
         }
     }
 }
@@ -118,28 +118,17 @@ impl TryFrom<StoredThreadMessage> for ThreadMessage {
             }),
 
             "tool_call" => {
-                let tool_call_id = message
-                    .tool_call_id
-                    .ok_or_else(|| {
-                        AgentError::Runtime(
-                            "Tool call message is missing tool_call_id".into(),
-                        )
-                    })?;
+                let tool_call_id = message.tool_call_id.ok_or_else(|| {
+                    AgentError::Runtime("Tool call message is missing tool_call_id".into())
+                })?;
 
-                let tool_name = message
-                    .tool_name
-                    .ok_or_else(|| {
-                        AgentError::Runtime(
-                            "Tool call message is missing tool_name".into(),
-                        )
-                    })?;
+                let tool_name = message.tool_name.ok_or_else(|| {
+                    AgentError::Runtime("Tool call message is missing tool_name".into())
+                })?;
 
-                let arguments = serde_json::from_str(&message.content)
-                    .map_err(|e| {
-                        AgentError::Runtime(format!(
-                            "Invalid tool call arguments: {e}"
-                        ))
-                    })?;
+                let arguments = serde_json::from_str(&message.content).map_err(|e| {
+                    AgentError::Runtime(format!("Invalid tool call arguments: {e}"))
+                })?;
 
                 Ok(ThreadMessage::ToolCall {
                     id: message.id,
@@ -150,28 +139,17 @@ impl TryFrom<StoredThreadMessage> for ThreadMessage {
             }
 
             "tool_result" => {
-                let tool_call_id = message
-                    .tool_call_id
-                    .ok_or_else(|| {
-                        AgentError::Runtime(
-                            "Tool result message is missing tool_call_id".into(),
-                        )
-                    })?;
+                let tool_call_id = message.tool_call_id.ok_or_else(|| {
+                    AgentError::Runtime("Tool result message is missing tool_call_id".into())
+                })?;
 
-                let tool_name = message
-                    .tool_name
-                    .ok_or_else(|| {
-                        AgentError::Runtime(
-                            "Tool result message is missing tool_name".into(),
-                        )
-                    })?;
+                let tool_name = message.tool_name.ok_or_else(|| {
+                    AgentError::Runtime("Tool result message is missing tool_name".into())
+                })?;
 
-                let content = serde_json::from_str(&message.content)
-                    .map_err(|e| {
-                        AgentError::Runtime(format!(
-                            "Invalid tool result content: {e}"
-                        ))
-                    })?;
+                let content = serde_json::from_str(&message.content).map_err(|e| {
+                    AgentError::Runtime(format!("Invalid tool result content: {e}"))
+                })?;
 
                 Ok(ThreadMessage::ToolResult {
                     id: message.id,

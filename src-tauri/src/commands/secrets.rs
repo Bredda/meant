@@ -1,9 +1,9 @@
 use tauri::State;
 
 use crate::state::AppState;
-use crate::vault::SecretStore;
 use crate::vault::error::VaultError;
 use crate::vault::secrets::{ProviderId, SecretStatus};
+use crate::vault::SecretStore;
 
 /// Presence-only inventory of provider credentials.
 ///

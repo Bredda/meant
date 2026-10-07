@@ -3,10 +3,10 @@
 
 mod ai;
 mod commands;
-mod db;
-mod state;
-mod runs;
 mod config;
+mod db;
+mod runs;
+mod state;
 mod storage;
 mod vault;
 
@@ -15,13 +15,10 @@ use tauri::Manager;
 use db::ThreadRepository;
 use state::AppState;
 
-use crate::{
-    config::config_store,
-    vault::keyring_store::KeyringStore,
-};
+use crate::{config::config_store, vault::keyring_store::KeyringStore};
 
 fn main() {
-     #[cfg(debug_assertions)]
+    #[cfg(debug_assertions)]
     {
         dotenvy::dotenv().ok();
     }
@@ -54,9 +51,7 @@ fn main() {
             commands::secrets::list_secrets,
             commands::secrets::set_secret,
             commands::secrets::delete_secret
-            ]
-        
-        )
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

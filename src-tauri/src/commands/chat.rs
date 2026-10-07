@@ -1,7 +1,10 @@
 use tauri::{ipc::Channel, State};
 
 use crate::{
-    AppState, ai::agent::types::{AgentEvent, ThreadMessage}, db::models::StoredThreadMessage, runs::service::{Run, RunStatus},
+    ai::agent::types::{AgentEvent, ThreadMessage},
+    db::models::StoredThreadMessage,
+    runs::service::{Run, RunStatus},
+    AppState,
 };
 
 #[derive(serde::Deserialize)]
@@ -9,7 +12,7 @@ use crate::{
 pub struct ChatRequest {
     pub thread_id: Option<String>,
     pub input: String,
-    pub model: String, // Eg. "anthropic/claude-sonnet-4.6" or "openai/gpt-5.1"
+    pub model: String,      // Eg. "anthropic/claude-sonnet-4.6" or "openai/gpt-5.1"
     pub tools: Vec<String>, // Eg. ["echo"]
 }
 
@@ -109,7 +112,6 @@ pub async fn chat(
 
     Ok(())
 }
-
 
 /// Maps a produced `ThreadMessage` to a stored row, or `None` for kinds
 /// that are already persisted upstream (e.g. `User`).

@@ -3,8 +3,8 @@ use rig::providers::{anthropic, openai};
 
 use crate::ai::agent::runtime::AgentError;
 use crate::ai::tools::echo::Echo;
-use crate::vault::SecretStore;
 use crate::vault::secrets::ProviderId;
+use crate::vault::SecretStore;
 
 const PREAMBLE: &str = "You are a helpful assistant. Answer clearly and concisely.";
 
@@ -33,8 +33,8 @@ pub fn build_agent<S: SecretStore>(
 
     let agent = match provider {
         ProviderId::Anthropic => {
-            let client = anthropic::Client::new(&key)
-                .map_err(|e| AgentError::Provider(e.to_string()))?;
+            let client =
+                anthropic::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
             client
                 .agent(anthropic::completion::CLAUDE_SONNET_4_6)
                 .preamble(PREAMBLE)
@@ -43,8 +43,8 @@ pub fn build_agent<S: SecretStore>(
                 .build()
         }
         ProviderId::OpenAi => {
-            let client = openai::Client::new(&key)
-                .map_err(|e| AgentError::Provider(e.to_string()))?;
+            let client =
+                openai::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
             client
                 .agent(openai::completion::GPT_5_1)
                 .preamble(PREAMBLE)

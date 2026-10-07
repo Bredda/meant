@@ -1,9 +1,6 @@
-use tauri::{State};
+use tauri::State;
 
-use crate::{
-    db::models::StoredThreadMessage,
-    AppState,
-};
+use crate::{db::models::StoredThreadMessage, AppState};
 
 #[tauri::command]
 pub fn get_thread_messages(

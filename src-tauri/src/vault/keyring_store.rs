@@ -1,5 +1,5 @@
+use super::SecretStore;
 use keyring::Entry;
-use super::{SecretStore};
 
 use crate::vault::error::VaultError;
 
@@ -9,7 +9,9 @@ pub struct KeyringStore {
 
 impl KeyringStore {
     pub fn new(service: impl Into<String>) -> Self {
-        Self { service: service.into() }
+        Self {
+            service: service.into(),
+        }
     }
 
     fn entry(&self, key: &str) -> Result<Entry, VaultError> {
@@ -27,7 +29,9 @@ impl SecretStore for KeyringStore {
     }
 
     fn set_secret(&self, key: &str, value: &str) -> Result<(), VaultError> {
-        self.entry(key)?.set_password(value).map_err(VaultError::from)
+        self.entry(key)?
+            .set_password(value)
+            .map_err(VaultError::from)
     }
 
     fn delete_secret(&self, key: &str) -> Result<(), VaultError> {
@@ -38,18 +42,15 @@ impl SecretStore for KeyringStore {
     }
 }
 
-
 /**
  * TESTS
  */
 
- #[cfg(test)]
+#[cfg(test)]
 mod tests {
-use std::collections::HashMap;
-use std::sync::Mutex;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
 
-use crate::vault::SecretStore;
-use crate::vault::error::VaultError;
-
-
+    use crate::vault::error::VaultError;
+    use crate::vault::SecretStore;
 }

@@ -29,7 +29,4 @@ pub struct StoredThreadMessage {
 
     /// Tool name for tool_call/tool_result messages.
     pub tool_name: Option<String>,
-
-
-
 }

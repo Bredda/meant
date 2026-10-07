@@ -1,7 +1,7 @@
+use crate::storage::{codec::Codec, error::StoreError};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{de::DeserializeOwned, Serialize};
-use crate::storage::{codec::Codec, error::StoreError};
 
 pub struct AtomicFileStore<T, C: Codec> {
     path: PathBuf,
@@ -86,10 +86,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::config::AppConfig;
     use crate::storage::codec::TomlCodec;
-    use super::*;
-    
+
     #[test]
     fn load_returns_none_when_file_does_not_exist() {
         let dir = tempfile::tempdir().unwrap();
@@ -100,14 +100,17 @@ mod tests {
 
         assert_eq!(result, None);
     }
-    
+
     #[test]
     fn save_then_load_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let store: AtomicFileStore<AppConfig, TomlCodec> =
             AtomicFileStore::new(dir.path().join("config.toml"));
 
-        let config = AppConfig { theme: "dark".to_string(), username: "toto".to_string() };
+        let config = AppConfig {
+            theme: "dark".to_string(),
+            username: "toto".to_string(),
+        };
         store.save(&config).unwrap();
 
         let loaded = store.load().unwrap();
@@ -134,9 +137,11 @@ mod tests {
         let store: AtomicFileStore<AppConfig, TomlCodec> =
             AtomicFileStore::new(dir.path().join("config.toml"));
 
-        let updated = store.update(|config| {
-            config.theme = "light".to_string();
-        }).unwrap();
+        let updated = store
+            .update(|config| {
+                config.theme = "light".to_string();
+            })
+            .unwrap();
 
         assert_eq!(updated.theme, "light");
     }

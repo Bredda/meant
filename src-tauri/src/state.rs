@@ -12,7 +12,7 @@ use crate::{
     db::ThreadRepository,
     runs::service::RunService,
     storage::{codec::TomlCodec, file_store::AtomicFileStore},
-    vault::{SecretStore, keyring_store::KeyringStore, secrets::ProviderId},
+    vault::{keyring_store::KeyringStore, secrets::ProviderId, SecretStore},
 };
 
 pub struct AppState {
