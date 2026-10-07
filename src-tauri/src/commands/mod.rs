@@ -1,6 +1,10 @@
+pub mod cancel_run;
 pub mod chat;
+pub mod delete_thread;
 pub mod get_thread;
 pub mod list_threads;
+pub mod regenerate;
+pub mod rename_thread;
 pub mod secrets;
 pub mod setup;
 pub mod update_config;

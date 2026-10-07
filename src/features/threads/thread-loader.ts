@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Thread, ThreadMessage } from "@/lib/types";
+import type { RunSummary, Thread, ThreadMessage } from "@/lib/types";
 
 export type ThreadLoaderData = {
   thread: Thread;
   messages: ThreadMessage[];
+  runs: RunSummary[];
 };
 
 export function getThread(threadId: string) {

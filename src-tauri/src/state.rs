@@ -10,7 +10,7 @@ use crate::{
     },
     config::AppConfig,
     db::ThreadRepository,
-    runs::service::RunService,
+    runs::{registry::RunRegistry, service::RunService},
     storage::{codec::TomlCodec, file_store::AtomicFileStore},
     vault::{keyring_store::KeyringStore, secrets::ProviderId, SecretStore},
 };
@@ -19,6 +19,8 @@ pub struct AppState {
     pub threads: ThreadRepository,
     pub config_store: AtomicFileStore<AppConfig, TomlCodec>,
     pub vault: KeyringStore,
+    /// The runs in progress, so they can be stopped from another command.
+    pub runs: RunRegistry,
     /// One cached agent per provider, each built on first use rather than at
     /// startup: a fresh install has no key until setup completes, a user can
     /// hold keys for several providers at once, and a key changed from
@@ -36,6 +38,7 @@ impl AppState {
             threads,
             config_store,
             vault,
+            runs: RunRegistry::default(),
             agents: RwLock::new(HashMap::new()),
         }
     }

@@ -19,8 +19,13 @@ export type RunAction =
   | {
       type: "reloadAfterFailure";
       persisted: ThreadMessage[];
-      /** The message carrying the failure warning, kept after the rows. */
+      /** The message carrying the failure warning. */
       warningId: string;
+      /**
+       * Whether the warning must stay after the rows: only when the failure
+       * left no run row to show it (it happened before the run was recorded).
+       */
+      keepWarning: boolean;
     };
 
 export function runReducer(
@@ -64,9 +69,12 @@ export function runReducer(
       return [...action.snapshot, ...action.persisted];
 
     // A failed run persists only the user message: show the rows as they
-    // really are (so the next run's snapshot matches the database), plus the
-    // warning, which exists only in the UI until runs are persisted.
+    // really are (so the next run's snapshot matches the database). The
+    // failure itself is then shown from the run row, except when it left none.
     case "reloadAfterFailure": {
+      if (!action.keepWarning) {
+        return action.persisted;
+      }
       const warning = messages.find(
         (message) => message.id === action.warningId
       );
@@ -89,4 +97,20 @@ export function isRunDisplayed(
   displayedThreadId: string | null
 ): boolean {
   return runThreadId === displayedThreadId;
+}
+
+/**
+ * The messages up to and including the last user message: what a regenerated
+ * run answers, and what stays on screen while it streams. `null` when there
+ * is no user message to answer.
+ */
+export function messagesThroughLastUser(
+  messages: ThreadMessage[]
+): ThreadMessage[] | null {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]?.role === "user") {
+      return messages.slice(0, index + 1);
+    }
+  }
+  return null;
 }

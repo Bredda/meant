@@ -11,22 +11,52 @@ import { useNavigate, useRevalidator } from "react-router";
 import { toast } from "sonner";
 import { useTextBuffer } from "@/hooks/use-text-buffer";
 import { type AppErrorKind, errorKind, errorMessage } from "@/lib/errors";
-import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
-import { isRunDisplayed, type RunAction, runReducer } from "./run-reducer";
+import type {
+  AgentEvent,
+  RunSummary,
+  Thread,
+  ThreadMessage,
+} from "@/lib/types";
+import {
+  isRunDisplayed,
+  messagesThroughLastUser,
+  type RunAction,
+  runReducer,
+} from "./run-reducer";
 import { getThread } from "./thread-loader";
 
 type SendMessageOptions = {
   onThreadCreated?: (thread: Thread) => void;
 };
 
+/** What `startRun` needs to begin a run. */
+type StartRun = {
+  command: "chat" | "regenerate";
+  /** The displayed messages the run builds on; `RunCompleted` follows them. */
+  snapshot: ThreadMessage[];
+  /** The typed message of a `chat` run, shown at once; absent to regenerate. */
+  content?: string;
+  options?: SendMessageOptions;
+};
+
 type ThreadContextValue = {
   thread: Thread | null;
   messages: ThreadMessage[];
+  /** The thread's persisted runs, for the notices of failed or stopped ones. */
+  runs: RunSummary[];
   isBusy: boolean;
+  /** Stops the running response; `null` until the run is known to the backend. */
+  cancelRun: (() => void) | null;
 
   sendMessage: (input: string, options?: SendMessageOptions) => Promise<void>;
+  /** Answers the last user message again, replacing the previous answer. */
+  regenerate: () => Promise<void>;
 
-  hydrate: (thread: Thread, messages: ThreadMessage[]) => void;
+  hydrate: (
+    thread: Thread,
+    messages: ThreadMessage[],
+    runs: RunSummary[]
+  ) => void;
 
   reset: () => void;
 };
@@ -41,7 +71,11 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  const [runs, setRuns] = useState<RunSummary[]>([]);
+
   const [isBusy, setIsBusy] = useState(false);
+  // Known from the run's first event; what `cancel_run` needs.
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   // Refreshes route loaders (the sidebar list is ordered by last activity).
   const { revalidate } = useRevalidator();
@@ -77,6 +111,9 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
    */
   const preRunMessagesRef = useRef<ThreadMessage[]>([]);
 
+  // Message carrying the live failure warning of the last failed run.
+  const failureWarningIdRef = useRef<string | null>(null);
+
   /*
    * Monotonic local position for optimistic messages.
    * Purely cosmétic : this values are replaced
@@ -109,8 +146,21 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const endRun = useCallback(() => {
     activeRunRef.current = false;
     currentAssistantMessageIdRef.current = null;
+    setActiveRunId(null);
     setIsBusy(false);
   }, []);
+
+  const cancelRun = useCallback(() => {
+    if (!activeRunId) {
+      return;
+    }
+    // The run ends through its own RunCompleted event (status `cancelled`).
+    invoke("cancel_run", { runId: activeRunId }).catch((error: unknown) => {
+      toast.error("Could not stop the response", {
+        description: errorMessage(error),
+      });
+    });
+  }, [activeRunId]);
 
   const handleError = useCallback(
     (message: string, runThreadId: string | null, kind: AppErrorKind) => {
@@ -143,13 +193,27 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
+      failureWarningIdRef.current = warningId;
       endRun();
+    },
+    [dispatch, endRun, navigate, textBuffer]
+  );
 
-      if (!runThreadId) {
+  /**
+   * Shows the failed run as the database has it. Called once `invoke` has
+   * settled, not on the `Error` event: the run row is closed (`failed`) only
+   * after the event, so reading sooner would find it still `running`.
+   */
+  const reloadAfterFailure = useCallback(
+    (runThreadId: string | null, runId: string | null) => {
+      const warningId = failureWarningIdRef.current;
+      failureWarningIdRef.current = null;
+      if (!(runThreadId && warningId)) {
         return;
       }
+
       getThread(runThreadId)
-        .then(({ messages: persisted }) => {
+        .then(({ messages: persisted, runs: persistedRuns }) => {
           // Skip if the user moved on or already started another run.
           if (
             activeRunRef.current ||
@@ -157,13 +221,21 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           ) {
             return;
           }
-          dispatch({ type: "reloadAfterFailure", persisted, warningId });
+          setRuns(persistedRuns);
+          dispatch({
+            type: "reloadAfterFailure",
+            persisted,
+            warningId,
+            // No run row (failure before the run was recorded): nothing else
+            // would show the error, so the live warning stays.
+            keepWarning: !persistedRuns.some((run) => run.id === runId),
+          });
         })
         .catch((error: unknown) => {
           console.error("Could not reload thread after a failed run", error);
         });
     },
-    [dispatch, endRun, navigate, textBuffer]
+    [dispatch]
   );
 
   /**
@@ -178,43 +250,46 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       if (event.type === "RunCompleted" || event.type === "Error") {
         endRun();
       }
-      if (event.type === "RunCompleted") {
-        revalidate();
-      }
     },
-    [endRun, revalidate, textBuffer]
+    [endRun, textBuffer]
   );
 
-  const sendMessage = useCallback(
-    async (input: string, options?: SendMessageOptions) => {
-      const content = input.trim();
-
-      if (!content || activeRunRef.current) {
-        return;
-      }
-
+  /**
+   * Runs the `chat` or `regenerate` command and renders it as it streams.
+   * Both end the same way: `RunCompleted` carries the persisted messages that
+   * follow `snapshot`.
+   */
+  const startRun = useCallback(
+    async ({ command, snapshot, content, options }: StartRun) => {
       /**
        * Snapshot taken BEFORE any optimistic update:
        * this is the basis on which we build final state when RunCompleted
        */
-      preRunMessagesRef.current = messagesRef.current;
-      livePositionRef.current = messagesRef.current.length;
+      preRunMessagesRef.current = snapshot;
+      livePositionRef.current = snapshot.length;
       currentAssistantMessageIdRef.current = null;
 
       // The thread this run belongs to, whatever the user opens meanwhile.
       let runThreadId = threadIdRef.current;
+      // Known from the first event; tells the reload which run row to expect.
+      let runId: string | null = null;
 
-      // Optimistic user message
-      dispatch({
-        type: "append",
-        message: {
-          id: crypto.randomUUID(),
-          role: "user",
-          content,
-          position: livePositionRef.current++,
-          threadId: runThreadId ?? "",
-        },
-      });
+      if (content === undefined) {
+        // Regenerating: the answer being replaced leaves the screen now.
+        setMessages(snapshot);
+      } else {
+        // Optimistic user message
+        dispatch({
+          type: "append",
+          message: {
+            id: crypto.randomUUID(),
+            role: "user",
+            content,
+            position: livePositionRef.current++,
+            threadId: runThreadId ?? "",
+          },
+        });
+      }
 
       activeRunRef.current = true;
       setIsBusy(true);
@@ -222,6 +297,10 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       const channel = new Channel<AgentEvent>();
 
       channel.onmessage = (event) => {
+        runId = event.data.runId;
+        if (event.type !== "RunCompleted" && event.type !== "Error") {
+          setActiveRunId(runId);
+        }
         const displayed = isRunDisplayed(runThreadId, threadIdRef.current);
 
         if (event.type === "ThreadCreated") {
@@ -310,7 +389,12 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "ToolCallCompleted": {
-            const { toolCallId, toolName, content: toolContent } = event.data;
+            const {
+              toolCallId,
+              toolName,
+              content: toolContent,
+              isError,
+            } = event.data;
 
             dispatch({
               type: "append",
@@ -320,6 +404,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
                 toolCallId,
                 toolName,
                 content: toolContent,
+                isError,
                 position: livePositionRef.current++,
                 threadId: runThreadId ?? "",
               },
@@ -341,8 +426,10 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
               persisted: event.data.messages,
             });
 
+            // Route data is refreshed once `chat` resolves: the run row is
+            // closed after this event, so refreshing now would read it
+            // still `running`.
             endRun();
-            revalidate();
 
             break;
           }
@@ -358,25 +445,26 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       };
 
       try {
-        await invoke("chat", {
-          request: {
-            threadId: runThreadId,
-            input: content,
-          },
+        await invoke(command, {
+          request: { threadId: runThreadId, input: content },
           channel,
         });
+        // Sidebar order, thread title and run notices, now the run is closed.
+        revalidate();
       } catch (error) {
         // A run failure arrives twice: as an Error event, then as this
         // rejection. Only failures before the run started (no provider,
         // unknown thread) have no event, and the run is still active then.
-        if (!activeRunRef.current) {
-          return;
+        if (activeRunRef.current) {
+          if (!isRunDisplayed(runThreadId, threadIdRef.current)) {
+            endRun();
+            return;
+          }
+          handleError(errorMessage(error), runThreadId, errorKind(error));
         }
-        if (!isRunDisplayed(runThreadId, threadIdRef.current)) {
-          endRun();
-          return;
-        }
-        handleError(errorMessage(error), runThreadId, errorKind(error));
+
+        // The run row is closed by now, whichever of the two reported it.
+        reloadAfterFailure(runThreadId, runId);
       }
     },
     [
@@ -384,14 +472,47 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       endRun,
       handleError,
       handleHiddenRunEvent,
+      reloadAfterFailure,
       revalidate,
       textBuffer,
     ]
   );
 
+  const sendMessage = useCallback(
+    async (input: string, options?: SendMessageOptions) => {
+      const content = input.trim();
+
+      if (!content || activeRunRef.current) {
+        return;
+      }
+
+      await startRun({
+        command: "chat",
+        snapshot: messagesRef.current,
+        content,
+        options,
+      });
+    },
+    [startRun]
+  );
+
+  const regenerate = useCallback(async () => {
+    const snapshot = messagesThroughLastUser(messagesRef.current);
+
+    if (!(threadIdRef.current && snapshot) || activeRunRef.current) {
+      return;
+    }
+
+    await startRun({ command: "regenerate", snapshot });
+  }, [startRun]);
+
   //Hydrates provider from /threads/:id loader.
   const hydrate = useCallback(
-    (thread: Thread, threadMessages: ThreadMessage[]) => {
+    (
+      thread: Thread,
+      threadMessages: ThreadMessage[],
+      threadRuns: RunSummary[]
+    ) => {
       //IMPORTANT : loader MUST NEVER overwrite a pending run.
       if (activeRunRef.current && threadIdRef.current === thread.id) {
         return;
@@ -401,6 +522,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
       setThread(thread);
       setMessages(threadMessages);
+      setRuns(threadRuns);
     },
     []
   );
@@ -410,6 +532,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
     threadIdRef.current = null;
     setThread(null);
     setMessages([]);
+    setRuns([]);
 
     // A run still streaming keeps its own state: its events stop touching
     // the display (isRunDisplayed) and it ends on RunCompleted or Error.
@@ -426,12 +549,26 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
     () => ({
       thread,
       messages,
+      runs,
       isBusy,
+      cancelRun: activeRunId ? cancelRun : null,
       sendMessage,
+      regenerate,
       hydrate,
       reset,
     }),
-    [thread, messages, isBusy, sendMessage, hydrate, reset]
+    [
+      thread,
+      messages,
+      runs,
+      isBusy,
+      activeRunId,
+      cancelRun,
+      sendMessage,
+      regenerate,
+      hydrate,
+      reset,
+    ]
   );
 
   return (

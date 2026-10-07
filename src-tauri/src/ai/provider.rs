@@ -29,15 +29,7 @@ pub fn build_agent<S: SecretStore>(
     provider: ProviderId,
     vault: &S,
 ) -> Result<rig::agent::Agent, AgentError> {
-    let key = vault
-        .get_secret(provider.secret_key())
-        .map_err(|e| AgentError::Provider(e.to_string()))?
-        .ok_or_else(|| {
-            AgentError::Provider(format!(
-                "No {} API key configured. Add one in Settings.",
-                provider.label()
-            ))
-        })?;
+    let key = api_key(provider, vault)?;
 
     let agent = match provider {
         ProviderId::Anthropic => {
@@ -58,6 +50,56 @@ pub fn build_agent<S: SecretStore>(
                 .preamble(PREAMBLE)
                 .default_max_turns(5)
                 .tool(Echo)
+                .build()
+        }
+    };
+
+    Ok(agent)
+}
+
+fn api_key<S: SecretStore>(provider: ProviderId, vault: &S) -> Result<String, AgentError> {
+    vault
+        .get_secret(provider.secret_key())
+        .map_err(|e| AgentError::Provider(e.to_string()))?
+        .ok_or_else(|| {
+            AgentError::Provider(format!(
+                "No {} API key configured. Add one in Settings.",
+                provider.label()
+            ))
+        })
+}
+
+/// Cap on the title call, in tokens. A title is a few words; the margin is for
+/// models that spend part of the budget reasoning before they answer.
+const TITLE_MAX_TOKENS: u64 = 120;
+
+/// Builds the one-shot agent that names a thread: no tools, a short answer.
+/// Not cached (it runs once per thread), so it reads the key itself like
+/// [`build_agent`].
+pub fn build_title_agent<S: SecretStore>(
+    provider: ProviderId,
+    vault: &S,
+    preamble: &str,
+) -> Result<rig::agent::Agent, AgentError> {
+    let key = api_key(provider, vault)?;
+
+    let agent = match provider {
+        ProviderId::Anthropic => {
+            let client =
+                anthropic::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
+            client
+                .agent(model_id(provider))
+                .preamble(preamble)
+                .max_tokens(TITLE_MAX_TOKENS)
+                .build()
+        }
+        ProviderId::OpenAi => {
+            let client =
+                openai::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
+            client
+                .agent(model_id(provider))
+                .preamble(preamble)
+                .max_tokens(TITLE_MAX_TOKENS)
                 .build()
         }
     };

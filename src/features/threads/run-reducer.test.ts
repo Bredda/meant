@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadMessage } from "@/lib/types";
-import { isRunDisplayed, runReducer } from "./run-reducer";
+import {
+  isRunDisplayed,
+  messagesThroughLastUser,
+  runReducer,
+} from "./run-reducer";
 
 const message = (
   id: string,
@@ -80,19 +84,59 @@ describe("isRunDisplayed", () => {
 });
 
 describe("runReducer after a failed run", () => {
-  it("shows the persisted rows followed by the warning", () => {
-    const live = [
-      message("tmp-user", "user", "hi"),
-      message("w1", "assistant", "⚠️ boom"),
-    ];
-    const persisted = [message("u-db", "user", "hi")];
+  const live = [
+    message("tmp-user", "user", "hi"),
+    message("w1", "assistant", "⚠️ boom"),
+  ];
+  const persisted = [message("u-db", "user", "hi")];
 
+  it("shows only the persisted rows when the run row carries the failure", () => {
     const next = runReducer(live, {
       type: "reloadAfterFailure",
       persisted,
       warningId: "w1",
+      keepWarning: false,
+    });
+
+    expect(next.map((m) => m.id)).toEqual(["u-db"]);
+  });
+
+  it("keeps the live warning when the failure left no run row", () => {
+    const next = runReducer(live, {
+      type: "reloadAfterFailure",
+      persisted,
+      warningId: "w1",
+      keepWarning: true,
     });
 
     expect(next.map((m) => m.id)).toEqual(["u-db", "w1"]);
+  });
+});
+
+describe("messagesThroughLastUser", () => {
+  it("drops the answer to the last user message, tool calls included", () => {
+    const messages = [
+      message("u1", "user"),
+      message("a1", "assistant"),
+      message("u2", "user"),
+      message("a2", "assistant"),
+    ];
+
+    expect(messagesThroughLastUser(messages)?.map((m) => m.id)).toEqual([
+      "u1",
+      "a1",
+      "u2",
+    ]);
+  });
+
+  it("keeps a thread whose last message is the unanswered user one", () => {
+    const messages = [message("u1", "user")];
+
+    expect(messagesThroughLastUser(messages)).toEqual(messages);
+  });
+
+  it("has nothing to regenerate without a user message", () => {
+    expect(messagesThroughLastUser([])).toBeNull();
+    expect(messagesThroughLastUser([message("a1", "assistant")])).toBeNull();
   });
 });

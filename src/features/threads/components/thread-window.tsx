@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import type { Thread, ThreadMessage } from "@/lib/types";
+import type { RunSummary, Thread, ThreadMessage } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { LocalInfos } from "./local-info";
 import { ThreadDisplay } from "./thread-display";
@@ -17,15 +17,21 @@ import { ThreadInput } from "./thread-input";
 type ThreadWindowProps = {
   thread: Thread;
   messages: ThreadMessage[];
+  runs: RunSummary[];
   isBusy: boolean;
   onSubmit: (input: string) => Promise<void>;
+  onCancel: (() => void) | null;
+  onRegenerate: (() => void) | null;
 };
 
 export function ThreadWindow({
   thread,
   messages,
+  runs,
   isBusy,
   onSubmit,
+  onCancel,
+  onRegenerate,
 }: ThreadWindowProps) {
   return (
     <div className="relative flex h-full min-h-0 flex-col gap-4">
@@ -40,10 +46,19 @@ export function ThreadWindow({
           </CardAction>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
-          <ThreadDisplay isBusy={isBusy} messages={messages} />
+          <ThreadDisplay
+            isBusy={isBusy}
+            messages={messages}
+            onRegenerate={onRegenerate}
+            runs={runs}
+          />
         </CardContent>
         <CardFooter className="flex-col gap-2">
-          <ThreadInput isBusy={isBusy} onSubmit={onSubmit} />
+          <ThreadInput
+            isBusy={isBusy}
+            onCancel={onCancel}
+            onSubmit={onSubmit}
+          />
         </CardFooter>
       </Card>
     </div>

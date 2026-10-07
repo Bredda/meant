@@ -1,4 +1,4 @@
-import type { ThreadMessage } from "@/lib/types";
+import type { RunSummary, Thread, ThreadMessage } from "@/lib/types";
 import type { RenderItem } from "./types";
 
 /**
@@ -7,14 +7,22 @@ import type { RenderItem } from "./types";
  *
  *  - one "message" item for every user/assistant
  *  - one "tool" item grouping ThreadToolCall and ThreadToolResult (if it exists) via toolCallId
+ *  - one "notice" item after the last item of every failed or cancelled run,
+ *    so a failure stays visible after a restart (runs are persisted)
  *
  * Works the same for live or persisted message historic
  * @param messages
+ * @param runs the thread's persisted runs, empty while nothing is loaded
  * @returns
  */
-export function groupMessages(messages: ThreadMessage[]): RenderItem[] {
+export function groupMessages(
+  messages: ThreadMessage[],
+  runs: RunSummary[] = []
+): RenderItem[] {
   const items: RenderItem[] = [];
   const toolItemIndexByCallId = new Map<string, number>();
+  // Index of the last item each run produced, where its notice goes.
+  const lastItemByRunId = new Map<string, number>();
 
   for (const message of messages) {
     switch (message.role) {
@@ -46,7 +54,52 @@ export function groupMessages(messages: ThreadMessage[]): RenderItem[] {
       default:
         console.warn("Unknown message type", message);
     }
+
+    if (message.runId) {
+      lastItemByRunId.set(message.runId, items.length - 1);
+    }
   }
 
-  return items;
+  return withRunNotices(items, runs, lastItemByRunId);
+}
+
+function withRunNotices(
+  items: RenderItem[],
+  runs: RunSummary[],
+  lastItemByRunId: Map<string, number>
+): RenderItem[] {
+  const endedEarly = runs.filter(
+    (run) =>
+      (run.status === "failed" || run.status === "cancelled") &&
+      lastItemByRunId.has(run.id)
+  );
+  if (endedEarly.length === 0) {
+    return items;
+  }
+
+  return items.flatMap((item, index) => [
+    item,
+    ...endedEarly
+      .filter((run) => lastItemByRunId.get(run.id) === index)
+      .map(
+        (run): RenderItem => ({ kind: "notice", key: `run:${run.id}`, run })
+      ),
+  ]);
+}
+
+const DIACRITICS = /\p{Diacritic}/gu;
+
+function normalizeForSearch(text: string): string {
+  return text.normalize("NFD").replace(DIACRITICS, "").toLowerCase();
+}
+
+/** The threads whose title contains `query`, ignoring case and accents. */
+export function filterThreads(threads: Thread[], query: string): Thread[] {
+  const needle = normalizeForSearch(query.trim());
+  if (!needle) {
+    return threads;
+  }
+  return threads.filter((thread) =>
+    normalizeForSearch(thread.title).includes(needle)
+  );
 }
