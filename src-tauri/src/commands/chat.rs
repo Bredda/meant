@@ -12,8 +12,6 @@ use crate::{
 pub struct ChatRequest {
     pub thread_id: Option<String>,
     pub input: String,
-    pub model: String,      // Eg. "anthropic/claude-sonnet-4.6" or "openai/gpt-5.1"
-    pub tools: Vec<String>, // Eg. ["echo"]
 }
 
 #[tauri::command]
