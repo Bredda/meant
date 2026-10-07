@@ -1,6 +1,6 @@
 # Corrections planifiées
 
-Revue du code existant, branche `feat/Vault-Access-#5` avec le travail non commité du 7 octobre 2026 (vault, providers, splashscreen, settings). **Aucune de ces corrections n'est appliquée** : chaque entrée attend d'être relue et validée.
+Revue du code existant, branche `feat/Vault-Access-#5` avec le travail non commité du 7 octobre 2026 (vault, providers, splashscreen, settings). Toutes les entrées ont été validées puis appliquées sur la branche `fix/review-fixes`, un commit par entrée (R6 en deux). Ce qui n'a pas pu être exercé dans l'application est signalé dans chaque statut et regroupé dans `todo.md`.
 
 Les grosses fonctionnalités sont dans [roadmap.md](roadmap.md), les idées non planifiées dans [backlog.md](backlog.md) et le plan en cours dans [todo.md](todo.md). Ce fichier liste ce qu'il faut corriger **avant** de repartir sur des fonctionnalités.
 
@@ -36,28 +36,28 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 **Constat :** `src/components/ui/spinner.tsx:4` type ses props en `React.ComponentProps<"svg">` puis les étale sur `RiLoaderLine`, dont les props interdisent `children`. `tsc` sort en erreur, et `pnpm build` (`tsc && vite build`) avec.
 **Correction :** typer les props avec `RemixiconProps` (`import type { RemixiconProps } from "@remixicon/react"`) ou retirer `children` avant l'étalement. Noter la retouche locale dans la skill `meant-ui` (un `shadcn add spinner --overwrite` la ferait disparaître).
 **Vérif. :** `pnpm typecheck` et `pnpm build` passent.
-**Statut :** Non exclure components/ui des check, format et lint
+**Statut :** OK (annotation corrigée en séance) — **Fait** (`ffbad43`). `pnpm typecheck` et `pnpm build` passent. Retouche notée dans la skill `meant-ui`.
 
 ### F0.2 — Fins de ligne CRLF (Majeur)
 
 **Constat :** `core.autocrlf=true` et pas de `.gitattributes`. Les fichiers extraits sont en CRLF, que Biome refuse (35 des 37 erreurs). Les fichiers créés récemment sont en LF : le dépôt est mixte.
 **Correction :** ajouter un `.gitattributes` (`* text=auto eol=lf`, plus `*.png *.ico *.icns binary`), puis `git add --renormalize .` dans un commit dédié, sans autre changement.
 **Vérif. :** `git ls-files --eol` ne montre plus de `w/crlf` ; `pnpm check` n'a plus d'erreur de format sur `src/`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`6db66a3`). Index déjà en LF ; copie de travail réécrite, plus aucun `w/crlf`.
 
 ### F0.3 — Biome analyse les fichiers générés de Tauri (Mineur)
 
 **Constat :** `src-tauri/gen/schemas/*.json` (générés par Tauri) sont vérifiés par Biome. `biome.jsonc` n'exclut que `components/ui`.
 **Correction :** ajouter `"!src-tauri/gen"` et `"!src-tauri/target"` dans `files.includes`.
 **Vérif. :** `pnpm check` passe sans erreur.
-**Statut :** OK
+**Statut :** OK — **Fait** (`1d3d486`). `pnpm check` passe. Ajout de `.claude/settings.local.json` au `.gitignore` (Biome ne lit pas l'ignore global de git).
 
 ### F0.4 — Pas de base rustfmt (Mineur)
 
 **Constat :** indentation et coupures irrégulières (`main.rs:24`, `react.rs`, `update_config.rs:25`) ; 67 écarts avec rustfmt.
 **Correction :** ajouter `src-tauri/rustfmt.toml` (`edition = "2021"`), lancer `cargo fmt` dans un commit qui ne fait que ça. Ce fichier active aussi le formatage Rust du hook Claude Code.
 **Vérif. :** `cargo fmt --check` passe.
-**Statut :** OK
+**Statut :** OK — **Fait** (`12a1f26`). `cargo fmt --check` passe.
 
 ### F0.5 — Avertissements clippy et code mort Rust (Mineur)
 
@@ -69,14 +69,14 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 - `TomlCodec::encode` (`storage/codec.rs:15`) : `PathBuf::new()` avec un commentaire « voir note plus bas » sans note.
 **Correction :** supprimer `ChatRole`, `ThreadMessage::content`, le module de tests vide, `tools/rig.rs` ; garder `DbError` et `RunStatus` pour R2 et R4 (ou les supprimer si ces entrées sont rejetées) ; marquer `ToolError` `#[allow(dead_code)]` avec une raison, ou le brancher dans `echo`. Pour `encode`, prendre le chemin en paramètre comme `decode`.
 **Vérif. :** `cargo clippy --all-targets -- -D warnings` passe.
-**Statut :** OK
+**Statut :** OK — **Fait** (`cd90a1c`). `cargo clippy -- -D warnings` passe ; `DbError` et `RunStatus` ont ensuite été branchés par R2 et R4.
 
 ### F0.6 — Le hook de pré-commit télécharge ultracite à chaque commit (Mineur)
 
 **Constat :** `package.json` › `lint-staged` lance `pnpm dlx ultracite fix`, et `.husky/pre-commit` lance `pnpm dlx lint-staged`, alors que les deux sont en devDependencies : téléchargement à chaque commit, et version potentiellement différente de celle du dépôt.
 **Correction :** `pnpm exec lint-staged` dans le hook et `ultracite fix` dans `lint-staged`. Ajouter un `pre-push` qui lance `pnpm typecheck`, `pnpm check`, puis `cargo clippy --all-targets -- -D warnings` et `cargo test` dans `src-tauri`.
 **Vérif. :** un commit sur un fichier mal formaté le corrige sans accès réseau ; un push avec une erreur de types est refusé.
-**Statut :** OK
+**Statut :** OK — **Fait** (`97da414`). pre-push testé : refusé avec une erreur de types, accepté sur une base propre. Le pre-commit hors réseau n'a pas été testé.
 
 ### F0.7 — Dépendances inutilisées ou mal branchées (Mineur)
 
@@ -87,7 +87,7 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 - `@tauri-apps/plugin-shell` n'est appelé nulle part (voir S3).
 **Correction :** retirer `react-hook-form`, `tailwindcss-animate` et `next-themes` ; ajouter `@import "tw-animate-css";` dans `global.css` ; faire lire le thème résolu à `sonner.tsx` depuis notre `useTheme` (retouche locale d'un composant shadcn, à noter dans la skill).
 **Vérif. :** `pnpm typecheck` ; dans l'app, un toast suit le thème sombre et un menu s'ouvre avec son animation.
-**Statut :** OK
+**Statut :** OK — **Fait** (`48e43d5`). Build OK. **Non exercé dans l'app** : toast en thème sombre, animation des menus.
 
 ---
 
@@ -98,42 +98,42 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 **Constat :** `commands/chat.rs:12-13` ajoute `model: String` et `tools: Vec<String>` (non optionnels, jamais lus), mais `thread-context.tsx:317` n'envoie que `threadId` et `input`. La désérialisation de la commande échoue (« missing field `model` ») : aucun message ne peut être envoyé.
 **Correction :** retirer les deux champs ; le choix du modèle et des outils sera conçu avec l'axe « Modèles » de la roadmap. Si on veut garder la forme de la requête, les passer en `Option<_>` avec `#[serde(default)]`.
 **Vérif. :** `cargo check` ; dans l'app, un premier message dans un nouveau fil reçoit une réponse.
-**Statut :** OK
+**Statut :** OK — **Fait** (`2bb31f3`). `cargo check`. **Non exercé dans l'app** (pas de clé de test).
 
 ### B2 — Une erreur de run s'affiche jusqu'à trois fois (Majeur)
 
 **Constat :** sur une erreur de flux, `react.rs:117` émet `Error` puis renvoie `Err` ; `RunService::run` (`runs/service.rs:55`) émet un second `Error` ; `chat` renvoie l'erreur, l'`invoke` est rejeté et `thread-context.tsx:325` appelle encore `handleError`. Le premier appel ajoute le message au segment en cours, les suivants créent chacun un message « ⚠️ ».
 **Correction :** un seul émetteur, `RunService` (supprimer l'émission dans `react.rs`) ; côté UI, ignorer le rejet de l'`invoke` si un `Error` a déjà terminé le run (`activeRunRef.current === false`). Les erreurs survenues avant le run (pas de provider, fil introuvable) n'arrivent que par le rejet : elles restent affichées une fois.
 **Vérif. :** test Rust de `RunService` avec un runtime factice qui échoue : un seul `Error` émis. Dans l'app, avec une clé invalide : un seul avertissement.
-**Statut :** OK
+**Statut :** OK — **Fait** (`8fa4d4c`). Test Rust « un seul `Error` émis ». **Non exercé dans l'app** avec une clé invalide.
 
 ### B3 — Changer de fil pendant un run mélange les conversations (Majeur)
 
 **Constat :** le `ThreadProvider` est monté une seule fois dans `AppLayout`. Si l'utilisateur ouvre un autre fil pendant un run, `hydrate` charge le fil B (le garde-fou de `thread-context.tsx:335` ne protège que le même fil), puis les événements du run A continuent d'être ajoutés à l'affichage, et `RunCompleted` remplace les messages de B par l'instantané de A (`thread-context.tsx:297`).
 **Correction :** capturer l'id du fil du run (mis à jour sur `ThreadCreated`) dans la closure de `sendMessage`. Pour tout événement dont le fil n'est plus celui affiché, ne mettre à jour que l'état du run (`activeRunRef`, `isBusy`), sans toucher aux messages. Sortir la logique de traitement des événements dans un réducteur pur (`features/threads/run-reducer.ts`) pour pouvoir la tester.
 **Vérif. :** tests du réducteur (événements d'un autre fil ignorés, `RunCompleted` du fil courant appliqué) ; dans l'app : lancer un run, ouvrir un autre fil, revenir, l'historique est correct.
-**Statut :** OK
+**Statut :** OK — **Fait** (`0bb2ff5`). Réducteur extrait et testé (Vitest). **Non exercé dans l'app** : changer de fil pendant un run.
 
 ### B4 — Un appel d'outil en tête de liste ne reçoit jamais son résultat (Mineur)
 
 **Constat :** `features/threads/utils.ts:37` teste `existing?.kind === "tool" && index` ; pour l'index 0, `index` est falsy et le résultat est ignoré. Rare aujourd'hui (un fil commence par un message utilisateur), mais faux.
 **Correction :** `index !== undefined`.
 **Vérif. :** test unitaire de `groupMessages` (voir R6).
-**Statut :** OK
+**Statut :** OK — **Fait** (`ea106d7`). Test de régression Vitest.
 
 ### B5 — `AppConfig::default()` ne respecte pas les valeurs par défaut (Majeur)
 
 **Constat :** `config/model.rs:3` dérive `Default`, ce qui donne `theme = ""` et `username = ""` ; les fonctions `default_theme` et `default_username` ne servent qu'à la désérialisation. `AtomicFileStore::update` part de `unwrap_or_default()` quand le fichier n'existe pas : une mise à jour partielle au premier lancement écrit un thème vide.
 **Correction :** implémenter `Default` à la main en appelant les mêmes fonctions, et ajouter un test « `update` sans fichier → thème `system` ». Voir aussi R5 (thème en enum).
 **Vérif. :** `cargo test`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`b2d0b86`). Test `cargo test`.
 
 ### B6 — Les résultats d'outils sont rejoués au modèle sous forme de JSON interne à Rig (Majeur)
 
 **Constat :** `react.rs:183` stocke `serde_json::to_value(&tool_result.content)`, c'est-à-dire la sérialisation de `OneOrMany<ToolResultContent>` (par exemple `[{"type":"text","text":"hello"}]`). Au tour suivant, `to_rig_message` (`react.rs:265`) le renvoie au modèle comme texte brut : le modèle voit la structure de Rig au lieu de `hello`. L'UI affiche la même structure.
 **Correction :** stocker le texte du résultat (concaténation des parties texte) dans `content`, et reconstruire `ToolResultContent::text` à partir de ce texte. Pour les anciens messages déjà stockés, accepter les deux formes à la lecture.
 **Vérif. :** test unitaire aller-retour `ThreadMessage::ToolResult` → ligne stockée → `to_rig_message` ; dans l'app, l'outil `echo` affiche `hello`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`c23d3ee`). Tests de l'extraction du texte, du rejeu au modèle et de la lecture des anciennes lignes. **Non exercé dans l'app** avec `echo`.
 
 ### B7 — Un run en échec laisse un message utilisateur orphelin (Mineur, décision à prendre)
 
@@ -142,21 +142,21 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 1. (Recommandé) Garder le message utilisateur et persister le texte partiel avec une marque d'échec ; c'est le travail de R4 (table `runs`, statut `failed`). En attendant, après un `Error`, recharger le fil depuis la base (`revalidate`) pour que l'UI montre l'état réel.
 2. Supprimer le message utilisateur en cas d'échec et le remettre dans le champ de saisie.
 **Vérif. :** dans l'app, avec une clé invalide puis valide : l'historique envoyé ne contient pas deux messages utilisateur à la suite, et l'affichage correspond à la base après rechargement.
-**Statut :** OK pour la recommandation
+**Statut :** OK pour la recommandation — **Fait** (`22e23fc`). Option recommandée : après un échec, l'UI recharge les lignes persistées et garde l'avertissement à la suite (testé dans le réducteur). Le statut `failed` vient de R4. **Non exercé dans l'app.**
 
 ### B8 — Le routeur est recréé à chaque rendu d'`AppRouter` (Mineur)
 
 **Constat :** `app/router.tsx:40` appelle `createAppRouter()` dans le rendu. Tout nouveau rendu d'`App` recrée le routeur, relance les loaders et perd l'état de navigation.
 **Correction :** créer le routeur une seule fois au niveau du module (ou `useMemo` sans dépendance).
 **Vérif. :** `pnpm typecheck` ; dans l'app, changer le thème depuis les réglages ne recharge pas la liste des fils.
-**Statut :** OK
+**Statut :** OK — **Fait** (`73a17c8`). `pnpm typecheck`. **Non exercé dans l'app.**
 
 ### B9 — Barre latérale : fil actif non réactif et liste non rafraîchie (Mineur)
 
 **Constat :** `components/sidebar/nav-threads.tsx:27` lit `window.location` (global) au lieu de `useLocation` : le fil actif n'est pas toujours mis en évidence après une navigation. La liste n'est revalidée qu'à la création d'un fil (`new-thread.tsx:19`) : après un échange dans un fil existant, l'ordre par `updated_at` n'est plus à jour. Directive `"use client"` héritée de Next.js inutile.
 **Correction :** `NavLink` (ou `useLocation`) ; revalider la liste sur `RunCompleted` ; retirer `"use client"`.
 **Vérif. :** dans l'app, le fil courant est surligné et remonte en tête après un message.
-**Statut :** OK
+**Statut :** OK — **Fait** (`c38c4a1`). `useLocation` et revalidation des loaders sur `RunCompleted`. **Non exercé dans l'app.**
 
 ---
 
@@ -167,28 +167,28 @@ But : que `pnpm typecheck`, `pnpm check`, `cargo fmt --check` et `cargo clippy` 
 **Constat :** `assistant-message.tsx:24` et `user-message.tsx:22` chargent `https://github.com/shadcn.png` à chaque message : une requête réseau vers un tiers, contraire au principe « rien ne quitte la machine ».
 **Correction :** retirer `AvatarImage` ; `AvatarFallback` avec une icône (assistant) et les initiales de `config.username` (utilisateur).
 **Vérif. :** `grep -r "https://" src` ne renvoie plus que des commentaires ; dans l'app, aucun appel réseau à l'ouverture d'un fil (onglet réseau des devtools).
-**Statut :** OK
+**Statut :** OK — **Fait** (`0895549`). Plus aucune URL distante dans `src` (hors `components/ui`). Avatar assistant : icône ; utilisateur : initiales du nom.
 
 ### S2 — Pas de Content Security Policy (Majeur)
 
 **Constat :** `tauri.conf.json` › `app.security.csp: null`. L'app affiche du Markdown produit par un LLM ; `react-markdown` n'interprète pas le HTML brut par défaut, mais sans CSP la moindre régression (plugin `rehype-raw`, lien `javascript:`) suffirait à exécuter du code avec accès à l'IPC.
 **Correction :** une CSP stricte, par exemple `default-src 'self'; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost`, à ajuster en dev (Vite sur `:1420`). Les appels aux providers partent de Rust et ne sont pas concernés.
 **Vérif. :** `pnpm tauri dev` et `pnpm tauri build` démarrent sans violation CSP dans la console ; une image distante dans une réponse Markdown est bloquée.
-**Statut :** OK
+**Statut :** OK — **Fait** (`e717c1d`). `csp` stricte et `devCsp` (autorise en plus le websocket et les scripts inline de Vite). `cargo check` valide la config. **Non exercé** : démarrage dev et build sans violation CSP.
 
 ### S3 — Plugin shell activé sans usage (Mineur)
 
 **Constat :** `tauri_plugin_shell` est initialisé (`main.rs:30`) et `shell:default` accordé (`capabilities/migrated.json`), mais rien ne l'utilise. La capability s'appelle encore `migrated` (migration depuis Tauri v1).
 **Correction :** retirer le plugin (Rust et npm) et la permission ; renommer la capability en `default` avec une description.
 **Vérif. :** `cargo check`, `pnpm typecheck`, l'app démarre.
-**Statut :** OK
+**Statut :** OK — **Fait** (`6412d7d`). Capability renommée `default`. `cargo check`, `pnpm typecheck`.
 
 ### S4 — Reliquats de configuration par variables d'environnement (Mineur)
 
 **Constat :** `main.rs:24` charge `.env` en debug (`dotenvy`) alors que les clés viennent désormais du vault ; `src/config/env.ts` et `src/lib/create-env.ts` valident un `VITE_API_URL` que rien n'utilise ; `.env.example` ne documente que cette variable. Un `.env` local contenant d'anciennes clés peut traîner.
 **Correction :** retirer `dotenvy`, `env.ts`, `create-env.ts` et `VITE_API_URL` ; réduire `.env.example` à un commentaire (« Meant ne lit plus de variables d'environnement ; les clés sont dans le vault »). Vérifier soi-même le `.env` local et le supprimer s'il ne contient que d'anciennes clés.
 **Vérif. :** `cargo check`, `pnpm typecheck`, l'app démarre sans `.env`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`d7a849c`). Ton `.env` local n'a été ni lu ni touché : à supprimer toi-même s'il ne contient que d'anciennes clés.
 
 ---
 
@@ -203,14 +203,14 @@ Ces entrées changent des contrats (base de données, IPC, erreurs). Chacune dem
 1. (Recommandé) `PRAGMA user_version` et une liste ordonnée de scripts SQL embarqués (`include_str!("migrations/0001_init.sql")`), appliqués dans une transaction au démarrage. Aucune dépendance.
 2. `rusqlite_migration` : même principe, en dépendance.
 **Vérif. :** tests sur base en mémoire : base vide → dernière version ; base créée par l'ancien code → migrée sans perte.
-**Statut :** OK pour recommandé
+**Statut :** OK pour recommandé — **Fait** (`7fe539e`). Tests : base vide, base créée par l'ancien code, double migration.
 
 ### R2 — Erreurs typées de bout en bout (Majeur)
 
 **Constat :** `ThreadRepository` renvoie `Result<_, String>` partout ; les commandes mélangent `String`, `StoreError` et `VaultError` ; `AgentError` implémente `Display` et `From<AgentError> for String` avec deux formats différents (`runtime.rs:31` et `:41`). L'UI reçoit des chaînes sans moyen de distinguer « pas de clé » d'une erreur réseau.
 **Correction :** `DbError` en `thiserror` (rusqlite, mutex) ; une `AppError` sérialisée `{ kind, message }` pour toutes les commandes (`kind` : `vault`, `config`, `db`, `provider`, `notFound`, `invalidInput`, `internal`) ; le TS reçoit un type `AppError` et les écrans réagissent au `kind` (par exemple « pas de provider » → lien vers les réglages). Retirer `From<AgentError> for String`.
 **Vérif. :** `cargo clippy`, `pnpm typecheck` ; dans l'app, envoyer un message sans clé valide affiche un message qui mène aux réglages.
-**Statut :** OK
+**Statut :** OK — **Fait** (`b19bf58`). `AppError { kind, message }`, `kind` aussi dans l'événement `Error` ; une erreur `provider` affiche un toast « Open Settings ». Tests Rust et Vitest. **Non exercé dans l'app.**
 
 ### R3 — Casse incohérente des données échangées par IPC (Majeur, décision à prendre)
 
@@ -219,35 +219,35 @@ Ces entrées changent des contrats (base de données, IPC, erreurs). Chacune dem
 1. (Recommandé) Tout en camelCase : `#[serde(rename_all = "camelCase")]` sur `StoredThreadMessage` et `rename_all_fields = "camelCase"` sur `AgentEvent`, puis mise à jour de `lib/types.ts` et `thread-context.tsx` en une fois. C'est la convention JS et celle déjà retenue pour `Thread` et les requêtes.
 2. Générer les types TS depuis Rust (`ts-rs` ou `specta`/`tauri-specta`), ce qui supprime aussi la synchronisation manuelle. Plus de mise en place ; à envisager avec ou après l'option 1.
 **Vérif. :** `pnpm typecheck` ; dans l'app, un fil avec appel d'outil s'affiche en direct et après rechargement.
-**Statut :** OK pour reommandation
+**Statut :** OK pour reommandation — **Fait** (`17ce658`). Test Rust qui fige le camelCase. **Non exercé dans l'app.**
 
 ### R4 — Persistance d'un run : transaction et table `runs` (Majeur, décision à prendre)
 
 **Constat :** les messages produits sont insérés un par un (`chat.rs:95`), chacun dans sa propre opération : une erreur au milieu laisse un run à moitié écrit. `Run` et `RunStatus` existent sans être persistés, ce qui empêche de tracer un échec (B7), une annulation (roadmap) ou le coût d'un run.
 **Correction proposée :** `ThreadRepository::append_messages(thread_id, &[...])` en une transaction ; table `runs` (id, thread_id, provider, model, status, error, started_at, ended_at) écrite au début (`running`) et à la fin (`completed`/`failed`), avec la clé `run_id` sur les messages. Dépend de R1.
 **Vérif. :** tests du repository en mémoire (insertion atomique, statut `failed` après une erreur simulée).
-**Statut :** OK
+**Statut :** OK — **Fait** (`f364fcb`). Migration `0002_runs`, `start_run`/`finish_run`, `append_messages` en transaction, runs restés `running` passés en `failed` au démarrage. Tests du repository en mémoire.
 
 ### R5 — Thème et préférences validés côté Rust (Mineur)
 
 **Constat :** `AppConfig.theme` est un `String` (`config/model.rs:6`) et `UpdateConfigRequest` accepte n'importe quelle valeur ; seul le type TS le restreint à `light | dark | system`. Le `username` n'est validé que côté UI (3 à 10 caractères), avec la règle dupliquée entre `lib/schemas.ts` et `splash-form.tsx:43`.
 **Correction :** `enum Theme { Light, Dark, System }` en `serde(rename_all = "lowercase")` (compatible avec les fichiers existants) ; validation du `username` dans `update_config` ; `splash-form.tsx` réutilise `preferencesSchema`.
 **Vérif. :** `cargo test` (décodage d'un `config.toml` existant, refus d'un thème inconnu) ; `pnpm typecheck`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`f665db1`). Tests Rust (ancien `config.toml`, thème inconnu, règle du nom) et Vitest.
 
 ### R6 — Tests du cœur métier (Majeur)
 
 **Constat :** seuls `storage` et `vault` sont testés. Rien ne couvre la conversion des messages (`to_rig_message`, `TryFrom<StoredThreadMessage>`), le repository, ni la logique pure du frontend (`groupMessages`, futur réducteur de run). Pas d'outil de test côté TS.
 **Correction :** Vitest (sans DOM) pour `features/threads/utils.ts`, le réducteur de B3 et `lib/schemas.ts`, avec un script `pnpm test`. Côté Rust : `ThreadRepository` constructible sur `Connection::open_in_memory()` pour le tester, et des tests aller-retour des messages. Ajouter `pnpm test` au pre-push (F0.6).
 **Vérif. :** `pnpm test` et `cargo test` passent et couvrent les cas listés.
-**Statut :** OK
+**Statut :** OK — **Fait** (`8b6d0ff, 94177dc`). Vitest (`pnpm test`, 21 tests) et tests Rust (37 au total), ajoutés au pre-push.
 
 ### R7 — Intégration continue (Mineur)
 
 **Constat :** aucune CI ; les vérifications ne tournent que si on y pense.
 **Correction :** workflow GitHub Actions sur push et pull request : `pnpm typecheck`, `pnpm check`, `pnpm test`, puis `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` (Ubuntu, dépendances système de Tauri installées). Les builds d'installeurs restent hors périmètre (roadmap, axe « Distribution »).
 **Vérif. :** la CI passe sur une branche propre et échoue sur une erreur de types volontaire.
-**Statut :** OK
+**Statut :** OK — **Fait** (`e62034d`). **Non vérifié** : la CI ne tournera qu'après un push.
 
 ---
 
@@ -258,7 +258,7 @@ Ces entrées changent des contrats (base de données, IPC, erreurs). Chacune dem
 **Constat :** jamais importés : `hooks/use-threads.ts`, `lib/actions.ts` (et la commande Rust `get_thread_messages`, remplacée par `get_thread`), `components/sidebar/nav-secondary.tsx`, `components/sidebar/search-form.tsx`, `components/theme-toggle.tsx` (remplacé par le formulaire de préférences). Deux boutons de copie presque identiques : `clipboard-button.tsx` (`Clipboardbutton`) et `content-clipboard-button.tsx` (`ClipboardButton`).
 **Correction :** supprimer les fichiers inutilisés et la commande `get_thread_messages` ; fusionner les deux boutons de copie en un seul composant.
 **Vérif. :** `pnpm typecheck`, `cargo check`, `grep` des noms supprimés vide.
-**Statut :** OK
+**Statut :** OK — **Fait** (`005dca2`). `grep` des noms supprimés vide, `pnpm typecheck`, `cargo clippy`.
 
 ### C2 — Finitions d'interface (Mineur)
 
@@ -270,14 +270,14 @@ Ces entrées changent des contrats (base de données, IPC, erreurs). Chacune dem
 - page d'accueil (`home.tsx`) réduite au mot « Meant ».
 **Correction :** passer les textes en anglais, corriger les coquilles, retirer le bouton « Contact support », masquer le menu « + » tant que rien n'est branché (les idées vont au backlog), utiliser les tokens de thème dans `error-base.tsx`. La page d'accueil relève de la roadmap.
 **Vérif. :** `pnpm typecheck` ; passage visuel dans l'app en thème clair et sombre.
-**Statut :** OK
+**Statut :** OK — **Fait** (`fe17783`). Ligne « Path » retirée de « Thread infos » (l'idée est déjà au backlog). **Passage visuel non fait.**
 
 ### C3 — Petites incohérences de code React (Mineur)
 
 **Constat :** `ThemeProvider` reçoit `storageKey` (`provider.tsx:9`) qu'il étale sur le `Context.Provider` (`theme-provider.tsx:87`), reliquat de la version `localStorage` ; `console.debug` à chaque événement de stream (`thread-context.tsx:199`) et au chargement d'un fil (`thread.tsx:15`) ; `sendMessage` dépend de `messages` et est recréé à chaque flush du buffer (30 ms pendant un stream).
 **Correction :** retirer `storageKey` et les `console.debug` ; lire l'instantané via une ref pour stabiliser `sendMessage`.
 **Vérif. :** `pnpm typecheck`, `pnpm check`.
-**Statut :** OK
+**Statut :** OK — **Fait** (`f4422b4`). `pnpm typecheck`, `pnpm check`.
 
 ### C4 — Documentation de référence décalée (Mineur)
 
@@ -287,4 +287,4 @@ Ces entrées changent des contrats (base de données, IPC, erreurs). Chacune dem
 - `Cargo.toml` : `description = "A Tauri App"`, `authors = ["you"]`.
 **Correction :** renommer `reference/agents.md` en `reference/agent-runtime.md` et corriger les liens ; mettre `config.md` à jour (amorçage, vault, `ProviderId`, invariant « au moins un provider ») ; renseigner `Cargo.toml`.
 **Vérif. :** plus aucun lien mort dans `reference/` (`grep -n "AGENT.md" reference`).
-**Statut :** OK
+**Statut :** OK — **Fait** (`e7cb661`). `reference/agents.md` devient `agent-runtime.md` ; `AGENTS.md` et les skills mis à jour en même temps.
