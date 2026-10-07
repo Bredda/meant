@@ -28,7 +28,7 @@ cargo fmt --check
 - **Before handing work back**, run `pnpm typecheck`, `pnpm check`, `pnpm test`, `cargo clippy --all-targets` and `cargo test`, and say which ones fail. They all pass on `main`: a failure is yours to fix or report.
 - **Formatting**: Biome only for TS/JSON/CSS (no Prettier); rustfmt for Rust (`src-tauri/rustfmt.toml`). A Claude Code hook (`.claude/hooks/format-file.mjs`) formats every file you write with the same tools. `src/components/ui` (shadcn-generated) is excluded from Biome on purpose.
 - **Git hooks** (Husky): `pre-commit` runs lint-staged (ultracite fix on staged files); `commit-msg` runs commitlint (Conventional Commits, because release tooling reads them); `pre-push` runs typecheck, Biome, `cargo fmt --check` and clippy, no tests (CI runs those). Fix the cause of a failing hook, never `--no-verify`.
-- **CI** (`.github/workflows/ci.yml`, push to `main` and pull requests) runs the same checks plus `cargo fmt --check` and `pnpm build` on Ubuntu.
+- **CI** (`.github/workflows/ci.yml`, push to `main` and pull requests) runs commitlint on the PR's commits, the same checks plus `cargo fmt --check` and `pnpm build` on Ubuntu. `.github/workflows/release.yml` maintains the release PR and builds installers on release.
 - **Tests**: Rust tests live in `#[cfg(test)]` modules next to the code and stay hermetic (use `vault::mock::InMemoryStore`, `tempfile`, in-memory SQLite; never the real keyring or a provider). Frontend tests use Vitest (`pnpm test`), colocated `*.test.ts`, for pure logic only (no DOM, no `invoke`). UI flows need the real app: say what you could not exercise.
 
 ## Layout
@@ -49,7 +49,7 @@ cargo fmt --check
 | `src/hooks/`, `src/stores/` | IPC hooks (`use-bootstrap`, `use-secrets`, `use-config-update`) and Zustand stores (config cache). |
 | `src/lib/types.ts` | TS mirror of the IPC types (events, messages, config). Keep in sync with Rust by hand. |
 | `src/components/ui/` | shadcn components (generated, `radix-ui` + Tailwind 4). |
-| `reference/` | Architecture docs: `ARCHITECTURE.md`, `agent-runtime.md` (agent run), `config.md`. Read before changing a boundary. |
+| `reference/` | Architecture docs: `ARCHITECTURE.md`, `agent-runtime.md` (agent run), `config.md`, `release.md` (git flow and releases). Read before changing a boundary. |
 
 ## Work tracking (written in French)
 
@@ -84,7 +84,8 @@ When a plan is finished, set `todo.md` to "Aucun" and update the status in `road
 - Rust: `thiserror` enums for errors that cross a boundary, serialized to a string for the UI; no `unwrap()`/`expect()` outside tests and startup. TS: strict, no `any`, imports sorted by Biome.
 - Match the surrounding code (names, comment density). Comments explain *why*. Code, comments and UI strings are in English.
 - Keep changes scoped: do not reformat or "clean up" generated files (`src/components/ui`, `src-tauri/gen`) beyond the task.
-- Commits follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`). The user commits and merges; do not commit unless asked. Never commit `.env`.
+- Commits are atomic and follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`...): commitlint enforces it, and release-please builds the changelog and the next version from them. The user commits and merges; do not commit unless asked. Never commit `.env`.
+- Never edit `CHANGELOG.md`, the version in `package.json` or in `src-tauri/Cargo.toml`: the release PR owns them. Branching, merging and releases: `reference/release.md`.
 
 ## Gotchas
 

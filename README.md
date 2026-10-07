@@ -68,6 +68,7 @@ The same checks run in the pre-push hook and in CI. Conventions for contributors
 - [reference/ARCHITECTURE.md](reference/ARCHITECTURE.md): application boundaries (UI, IPC, Rust core, storage).
 - [reference/agent-runtime.md](reference/agent-runtime.md): how an agent run executes, streams and is persisted.
 - [reference/config.md](reference/config.md): preferences file and secrets boundary.
+- [reference/release.md](reference/release.md): git flow, CI and how releases are cut.
 - [roadmap.md](roadmap.md), [todo.md](todo.md), [backlog.md](backlog.md): planned work, current plan and ideas (in French).
 
 ## Status
