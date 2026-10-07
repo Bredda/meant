@@ -18,11 +18,6 @@ use state::AppState;
 use crate::{config::config_store, vault::keyring_store::KeyringStore};
 
 fn main() {
-    #[cfg(debug_assertions)]
-    {
-        dotenvy::dotenv().ok();
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
