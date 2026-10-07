@@ -84,7 +84,8 @@ pub enum ThreadMessage {
         id: String,
         tool_call_id: String,
         tool_name: String,
-        content: serde_json::Value,
+        /// The text the model sees, stored as is.
+        content: String,
     },
 }
 
@@ -133,9 +134,7 @@ impl TryFrom<StoredThreadMessage> for ThreadMessage {
                     AgentError::Runtime("Tool result message is missing tool_name".into())
                 })?;
 
-                let content = serde_json::from_str(&message.content).map_err(|e| {
-                    AgentError::Runtime(format!("Invalid tool result content: {e}"))
-                })?;
+                let content = stored_tool_result_text(message.content);
 
                 Ok(ThreadMessage::ToolResult {
                     id: message.id,
@@ -149,5 +148,74 @@ impl TryFrom<StoredThreadMessage> for ThreadMessage {
                 "Unknown thread message role: {role}"
             ))),
         }
+    }
+}
+
+/// Rows written before tool results were stored as text hold rig's serialized
+/// content (`[{"type":"text","text":"..."}]`): unwrap those, keep the rest.
+fn stored_tool_result_text(raw: String) -> String {
+    let Ok(serde_json::Value::Array(parts)) = serde_json::from_str::<serde_json::Value>(&raw)
+    else {
+        return raw;
+    };
+
+    let texts: Option<Vec<&str>> = parts
+        .iter()
+        .map(|part| part.get("text").and_then(serde_json::Value::as_str))
+        .collect();
+
+    match texts {
+        Some(texts) => texts.join("\n"),
+        None => raw,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stored_result(content: &str) -> StoredThreadMessage {
+        StoredThreadMessage {
+            id: "m1".into(),
+            position: 0,
+            created_at: 0,
+            thread_id: "t1".into(),
+            role: "tool_result".into(),
+            content: content.into(),
+            tool_call_id: Some("c1".into()),
+            tool_name: Some("echo".into()),
+        }
+    }
+
+    fn content_of(message: ThreadMessage) -> String {
+        match message {
+            ThreadMessage::ToolResult { content, .. } => content,
+            other => panic!("expected a tool result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tool_result_text_is_loaded_as_is() {
+        let message = ThreadMessage::try_from(stored_result("hello")).unwrap();
+
+        assert_eq!(content_of(message), "hello");
+    }
+
+    #[test]
+    fn legacy_rig_serialized_tool_result_is_unwrapped() {
+        let legacy = r#"[{"type":"text","text":"hello"}]"#;
+
+        let message = ThreadMessage::try_from(stored_result(legacy)).unwrap();
+
+        assert_eq!(content_of(message), "hello");
+    }
+
+    #[test]
+    fn json_tool_output_is_not_mistaken_for_legacy_rows() {
+        let json = r#"[{"id":1}]"#;
+
+        let message = ThreadMessage::try_from(stored_result(json)).unwrap();
+
+        assert_eq!(content_of(message), json);
     }
 }

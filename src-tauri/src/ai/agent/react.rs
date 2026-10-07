@@ -151,21 +151,20 @@ impl AgentRuntime for ReActAgent {
                     tool_result,
                     internal_call_id,
                 }) => {
-                    let content_value = serde_json::to_value(&tool_result.content)
-                        .map_err(|e| AgentError::Runtime(e.to_string()))?;
+                    let content = tool_result_text(&tool_result.content);
 
                     produced_messages.push(ThreadMessage::ToolResult {
                         id: uuid::Uuid::new_v4().to_string(),
                         tool_call_id: internal_call_id.clone(),
                         tool_name: tool_result.name.clone(),
-                        content: content_value.clone(),
+                        content: content.clone(),
                     });
                     emit(AgentEvent::ToolCallCompleted {
                         run_id: run.id.clone(),
                         thread_id: run.thread_id.clone(),
                         tool_name: tool_result.name.clone(),
                         tool_call_id: internal_call_id.clone(),
-                        content: content_value.to_string(),
+                        content,
                         is_error: false,
                     });
                 }
@@ -219,8 +218,55 @@ fn to_rig_message(message: &ThreadMessage) -> Result<Message, AgentError> {
             content: vec![UserContent::tool_result(
                 tool_call_id.clone(),
                 tool_name.clone(),
-                vec![ToolResultContent::text(content.to_string())],
+                vec![ToolResultContent::text(content.clone())],
             )],
         }),
+    }
+}
+
+/// Flattens a tool's output to the text replayed to the model on later turns
+/// and shown in the UI. Storing rig's own serialization instead would make the
+/// model read `[{"type":"text",...}]` rather than the tool's answer.
+fn tool_result_text(content: &[ToolResultContent]) -> String {
+    content
+        .iter()
+        .map(|part| match part {
+            ToolResultContent::Text(text) => text.text.clone(),
+            ToolResultContent::Json { value } => value.to_string(),
+            ToolResultContent::Image(_) => "[image]".to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_result_text_joins_parts_as_plain_text() {
+        let content = vec![
+            ToolResultContent::text("hello"),
+            ToolResultContent::Json {
+                value: serde_json::json!({ "n": 1 }),
+            },
+        ];
+
+        assert_eq!(tool_result_text(&content), "hello\n{\"n\":1}");
+    }
+
+    #[test]
+    fn tool_result_replays_its_text_to_the_model() {
+        let message = ThreadMessage::ToolResult {
+            id: "m1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "echo".into(),
+            content: "hello".into(),
+        };
+
+        let replayed = serde_json::to_string(&to_rig_message(&message).unwrap()).unwrap();
+
+        assert!(replayed.contains(r#""text":"hello""#), "{replayed}");
+        assert!(!replayed.contains(r#"\"text\""#), "{replayed}");
     }
 }

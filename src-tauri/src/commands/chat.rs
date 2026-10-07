@@ -142,7 +142,7 @@ fn persist_thread_message(
         } => (
             id,
             "tool_result",
-            serde_json::to_string(&content).map_err(|e| e.to_string())?,
+            content,
             Some(tool_call_id),
             Some(tool_name),
         ),
