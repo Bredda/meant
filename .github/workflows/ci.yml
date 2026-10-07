@@ -1,9 +1,20 @@
 name: CI
 
+# Documentation-only changes cannot break the build: skip the run.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "reference/**"
+      - "LICENSE"
+      - "assets/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "reference/**"
+      - "LICENSE"
+      - "assets/**"
 
 concurrency:
   group: ci-${{ github.ref }}

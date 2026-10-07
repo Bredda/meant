@@ -58,7 +58,7 @@ Four files at the repo root:
 - `roadmap.md`: the big features to come, by axis and horizon.
 - `todo.md`: the executable plan of the feature in progress (decisions, phases, **Vérif.** lines). Its "Mode d'emploi" explains how to work it. Read it before starting.
 - `backlog.md`: unscheduled ideas, features and fixes. Do not pick from it unless asked.
-- `fixes.md`: corrections planned by a code review. Each one is validated by the user (its *Statut* line) before it is implemented; empty when no review is pending.
+- `fixes.md`: only exists while a code review is pending. One entry per planned correction, each validated by the user (its *Statut* line) before it is implemented; the file is deleted once the review is applied.
 
 When a plan is finished, set `todo.md` to "Aucun" and update the status in `roadmap.md`.
 
