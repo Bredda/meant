@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunSummary, Thread, ThreadMessage } from "@/lib/types";
-import { filterThreads, groupMessages } from "./utils";
+import { filterThreads, groupMessages, isAwaitingFirstToken } from "./utils";
 
 const base = { position: 0, threadId: "t1" };
 
@@ -174,5 +174,23 @@ describe("filterThreads", () => {
 
   it("returns nothing when no title matches", () => {
     expect(filterThreads(threads, "zzz")).toEqual([]);
+  });
+});
+
+describe("isAwaitingFirstToken", () => {
+  it("is true while a run has only the question on screen", () => {
+    expect(isAwaitingFirstToken([user("u1")], true)).toBe(true);
+  });
+
+  it("ends with the first thing the run shows", () => {
+    expect(isAwaitingFirstToken([user("u1"), assistant("a1")], true)).toBe(
+      false
+    );
+    expect(isAwaitingFirstToken([user("u1"), call("c1")], true)).toBe(false);
+  });
+
+  it("is false when no run is on or nothing is displayed", () => {
+    expect(isAwaitingFirstToken([user("u1")], false)).toBe(false);
+    expect(isAwaitingFirstToken([], true)).toBe(false);
   });
 });

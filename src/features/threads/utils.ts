@@ -103,3 +103,15 @@ export function filterThreads(threads: Thread[], query: string): Thread[] {
     normalizeForSearch(thread.title).includes(needle)
   );
 }
+
+/**
+ * Whether a run is on but has shown nothing yet: the question is the last
+ * message, so the model is still working on its first token.
+ */
+export function isAwaitingFirstToken(
+  messages: ThreadMessage[],
+  isBusy: boolean
+): boolean {
+  const [last] = messages.slice(-1);
+  return isBusy && last?.role === "user";
+}

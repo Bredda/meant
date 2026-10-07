@@ -203,3 +203,33 @@
   -webkit-user-select: text !important;
   user-select: text !important;
 }
+
+/* Light sweeping across a text that stands for something in progress. */
+@utility shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-size: 250% 100%;
+  animation: shimmer 2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    color: var(--muted-foreground);
+    background-image: none;
+    animation: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

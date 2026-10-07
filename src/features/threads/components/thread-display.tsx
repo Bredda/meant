@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Marker, MarkerContent } from "@/components/ui/marker";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -7,7 +8,7 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
 import type { RunSummary, ThreadMessage } from "@/lib/types";
-import { groupMessages } from "../utils";
+import { groupMessages, isAwaitingFirstToken } from "../utils";
 import { AssistantMessage } from "./assistant-message";
 import { RegenerateButton } from "./regenerate-button";
 import { RunNotice } from "./run-notice";
@@ -27,12 +28,14 @@ export function ThreadDisplay({
   onRegenerate: (() => void) | null;
 }) {
   const items = useMemo(() => groupMessages(messages, runs), [messages, runs]);
+  // The question is sent, no answer has started: the model is still working.
+  const awaitingFirstToken = isAwaitingFirstToken(messages, isBusy);
 
   return (
     <MessageScrollerProvider>
       <MessageScroller>
         <MessageScrollerViewport>
-          <MessageScrollerContent aria-busy={isBusy} className="p-4">
+          <MessageScrollerContent aria-busy={isBusy} className="gap-4 p-4">
             {items.map((item) => {
               if (item.kind === "tool") {
                 return <ToolMessage item={item} key={item.key} />;
@@ -54,6 +57,11 @@ export function ThreadDisplay({
                 </div>
               );
             })}
+            {awaitingFirstToken && (
+              <Marker className="pl-10" role="status">
+                <MarkerContent className="shimmer">Thinking…</MarkerContent>
+              </Marker>
+            )}
             {onRegenerate && <RegenerateButton onClick={onRegenerate} />}
           </MessageScrollerContent>
         </MessageScrollerViewport>

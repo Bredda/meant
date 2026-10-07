@@ -21,6 +21,7 @@ React decides what the user sees; Rust decides what the app does. No domain logi
 - Add shadcn components with `pnpm dlx shadcn@latest add <name>` (config in `components.json`). `src/components/ui` is excluded from Biome; keep local edits there minimal and note them here. Current local edits (re-running `shadcn add <name> --overwrite` would drop them):
   - `spinner.tsx`: props typed as `ComponentProps<typeof RiLoaderLine>` instead of `ComponentProps<"svg">` (Remixicon forbids `children`, `tsc` fails otherwise).
   - `sonner.tsx`: `useTheme` from `@/components/theme-provider` instead of `next-themes` (not installed).
+  - `marker.tsx` and `alert-dialog.tsx`: `cn` from `@/lib/utils`. The registry versions import it from a `cn` package, and `shadcn add` then adds that package to `package.json`: revert that line if it happens. The `shimmer` class used with `Marker` is not in the registry: it is a utility defined in `src/app/global.css`.
 - Icons: `lucide-react` for UI icons, `@remixicon/react` for brand logos (providers). Do not add a third icon set.
 - Styling: Tailwind 4 utilities and the theme tokens in `src/app/global.css` (`bg-background`, `text-muted-foreground`, ...). No hardcoded palette colors (`bg-red-50`, `text-gray-900`): they break dark mode.
 - Navigation: `useNavigate` / `NavLink` / `useLocation`, never `window.location`.
