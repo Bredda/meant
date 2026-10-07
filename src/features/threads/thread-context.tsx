@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRevalidator } from "react-router";
 import { useTextBuffer } from "@/hooks/use-text-buffer";
 import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
 import { isRunDisplayed, type RunAction, runReducer } from "./run-reducer";
@@ -36,6 +37,9 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
 
   const [isBusy, setIsBusy] = useState(false);
+
+  // Refreshes route loaders (the sidebar list is ordered by last activity).
+  const { revalidate } = useRevalidator();
 
   /*
    * Refs = run technical state.
@@ -145,6 +149,25 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
     [dispatch, endRun, textBuffer]
   );
 
+  /**
+   * The user opened another thread: keep only the run lifecycle, the
+   * persisted result shows up when they come back to this thread.
+   */
+  const handleHiddenRunEvent = useCallback(
+    (event: AgentEvent) => {
+      textBuffer.stop(false);
+      textBuffer.clear();
+      currentAssistantMessageIdRef.current = null;
+      if (event.type === "RunCompleted" || event.type === "Error") {
+        endRun();
+      }
+      if (event.type === "RunCompleted") {
+        revalidate();
+      }
+    },
+    [endRun, revalidate, textBuffer]
+  );
+
   const sendMessage = useCallback(
     async (input: string, options?: SendMessageOptions) => {
       const content = input.trim();
@@ -191,14 +214,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!displayed) {
-          // The user opened another thread: keep only the run lifecycle, the
-          // persisted result shows up when they come back to this thread.
-          textBuffer.stop(false);
-          textBuffer.clear();
-          currentAssistantMessageIdRef.current = null;
-          if (event.type === "RunCompleted" || event.type === "Error") {
-            endRun();
-          }
+          handleHiddenRunEvent(event);
           return;
         }
 
@@ -315,6 +331,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
             });
 
             endRun();
+            revalidate();
 
             break;
           }
@@ -354,7 +371,15 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         );
       }
     },
-    [dispatch, endRun, handleError, messages, textBuffer]
+    [
+      dispatch,
+      endRun,
+      handleError,
+      handleHiddenRunEvent,
+      messages,
+      revalidate,
+      textBuffer,
+    ]
   );
 
   //Hydrates provider from /threads/:id loader.

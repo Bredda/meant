@@ -1,7 +1,5 @@
-"use client";
-
 import { BotMessageSquare, PlusIcon } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -21,10 +19,11 @@ import {
 
 function ThreadsList({ threads }: { threads: Thread[] }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   return (
     <>
       {threads.map((t) => {
-        const active = location.pathname === `/threads/${t.id}`;
+        const active = pathname === `/threads/${t.id}`;
 
         return (
           <SidebarMenuButton
