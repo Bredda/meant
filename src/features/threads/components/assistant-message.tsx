@@ -1,7 +1,8 @@
+import { BotIcon } from "lucide-react";
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Clipboardbutton } from "@/components/clipboard-button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ClipboardButton } from "@/components/clipboard-button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Message,
   MessageAvatar,
@@ -21,8 +22,9 @@ export function AssistantMessage({
     <Message align="start" className="group/message">
       <MessageAvatar>
         <Avatar>
-          <AvatarImage alt="@shadcn" src="https://github.com/shadcn.png" />
-          <AvatarFallback>CN</AvatarFallback>
+          <AvatarFallback>
+            <BotIcon className="size-4" />
+          </AvatarFallback>
         </Avatar>
       </MessageAvatar>
       <MessageContent>
@@ -35,9 +37,8 @@ export function AssistantMessage({
             copied && "opacity-100"
           )}
         >
-          <Clipboardbutton
+          <ClipboardButton
             content={message.content}
-            copied={copied}
             onCopiedChanged={setCopied}
           />
         </MessageFooter>

@@ -1,38 +1,53 @@
 import { CheckIcon, ClipboardCopyIcon } from "lucide-react";
-import { useState } from "react";
+import { type ComponentProps, type ReactNode, useState } from "react";
 import { Button } from "./ui/button";
 
-interface ClipboardButtonProps {
+type ClipboardButtonProps = {
   content: string;
-  copied?: boolean;
+  /** How long the "copied" state lasts, in milliseconds. */
+  timeout?: number;
   onCopiedChanged?: (copied: boolean) => void;
-}
+  /** Custom label; defaults to a copy / check icon. */
+  children?: (copied: boolean) => ReactNode;
+} & Omit<ComponentProps<typeof Button>, "children" | "onClick">;
 
-export function Clipboardbutton({
+export function ClipboardButton({
   content,
-  copied,
+  timeout = 3000,
   onCopiedChanged,
+  children,
+  ...props
 }: ClipboardButtonProps) {
-  const [_copied, _setCopied] = useState(copied ?? false);
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
-    _setCopied(true);
+    setCopied(true);
     onCopiedChanged?.(true);
     setTimeout(() => {
-      _setCopied(false);
+      setCopied(false);
       onCopiedChanged?.(false);
-    }, 3000);
+    }, timeout);
   };
+
+  if (children) {
+    return (
+      <Button {...props} onClick={handleCopy}>
+        {children(copied)}
+      </Button>
+    );
+  }
 
   return (
     <Button
       aria-label="Copy"
-      onClick={handleCopy}
       size="icon-sm"
       title="Copy"
       variant="ghost"
+      {...props}
+      onClick={handleCopy}
     >
-      {_copied ? <CheckIcon /> : <ClipboardCopyIcon />}
+      {copied ? <CheckIcon /> : <ClipboardCopyIcon />}
     </Button>
   );
 }

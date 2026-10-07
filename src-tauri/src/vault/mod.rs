@@ -1,8 +1,8 @@
-pub mod keyring_store;
 pub mod error;
-pub mod secrets;
+pub mod keyring_store;
 #[cfg(test)]
 mod mock;
+pub mod secrets;
 
 use crate::vault::error::VaultError;
 
@@ -72,9 +72,17 @@ mod tests {
     fn secrets_are_scoped_by_key() {
         let store = InMemoryStore::new();
         store.set_secret("openai_api_key", "sk-openai").unwrap();
-        store.set_secret("anthropic_api_key", "sk-anthropic").unwrap();
+        store
+            .set_secret("anthropic_api_key", "sk-anthropic")
+            .unwrap();
 
-        assert_eq!(store.get_secret("openai_api_key").unwrap(), Some("sk-openai".to_string()));
-        assert_eq!(store.get_secret("anthropic_api_key").unwrap(), Some("sk-anthropic".to_string()));
+        assert_eq!(
+            store.get_secret("openai_api_key").unwrap(),
+            Some("sk-openai".to_string())
+        );
+        assert_eq!(
+            store.get_secret("anthropic_api_key").unwrap(),
+            Some("sk-anthropic".to_string())
+        );
     }
 }

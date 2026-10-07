@@ -6,6 +6,10 @@ export type ThreadLoaderData = {
   messages: ThreadMessage[];
 };
 
+export function getThread(threadId: string) {
+  return invoke<ThreadLoaderData>("get_thread", { threadId });
+}
+
 export function threadLoader({
   params,
 }: {
@@ -15,9 +19,7 @@ export function threadLoader({
     throw new Response("Missing thread id", { status: 400 });
   }
 
-  return invoke<ThreadLoaderData>("get_thread", {
-    threadId: params.id,
-  });
+  return getThread(params.id);
 }
 
 export function threadsLoader() {

@@ -18,7 +18,9 @@ React decides what the user sees; Rust decides what the app does. No domain logi
 
 ## Components
 
-- Add shadcn components with `pnpm dlx shadcn@latest add <name>` (config in `components.json`). `src/components/ui` is excluded from Biome; keep local edits there minimal and note them (`spinner.tsx` needs a fix, see `fixes.md`).
+- Add shadcn components with `pnpm dlx shadcn@latest add <name>` (config in `components.json`). `src/components/ui` is excluded from Biome; keep local edits there minimal and note them here. Current local edits (re-running `shadcn add <name> --overwrite` would drop them):
+  - `spinner.tsx`: props typed as `ComponentProps<typeof RiLoaderLine>` instead of `ComponentProps<"svg">` (Remixicon forbids `children`, `tsc` fails otherwise).
+  - `sonner.tsx`: `useTheme` from `@/components/theme-provider` instead of `next-themes` (not installed).
 - Icons: `lucide-react` for UI icons, `@remixicon/react` for brand logos (providers). Do not add a third icon set.
 - Styling: Tailwind 4 utilities and the theme tokens in `src/app/global.css` (`bg-background`, `text-muted-foreground`, ...). No hardcoded palette colors (`bg-red-50`, `text-gray-900`): they break dark mode.
 - Navigation: `useNavigate` / `NavLink` / `useLocation`, never `window.location`.
@@ -27,7 +29,7 @@ React decides what the user sees; Rust decides what the app does. No domain logi
 
 ## Forms
 
-TanStack Form (`@tanstack/react-form`) with a zod schema from `src/lib/schemas.ts` as validator, rendered with the shadcn `Field*` components (see `features/settings/preferences.tsx`). Validation in the form is a convenience; Rust re-validates (keys in `vault/secrets.rs`). Reuse schemas rather than redefining a rule (the username rule is duplicated today, see `fixes.md`). Show backend errors in an `Alert` or `FieldError`, successes with `toast` (sonner).
+TanStack Form (`@tanstack/react-form`) with a zod schema from `src/lib/schemas.ts` as validator, rendered with the shadcn `Field*` components (see `features/settings/preferences.tsx`). Validation in the form is a convenience; Rust re-validates (keys in `vault/secrets.rs`). Reuse schemas rather than redefining a rule (`splash-form.tsx` builds on `preferencesSchema.shape`); a rule enforced in Rust too (username in `config/model.rs`) changes on both sides. Show backend errors in an `Alert` or `FieldError`, successes with `toast` (sonner).
 
 ## Theme
 
@@ -39,4 +41,4 @@ The streaming state machine lives in `features/threads/thread-context.tsx`: read
 
 ## Checks
 
-`pnpm typecheck` and `pnpm check` (run `pnpm fix` to apply Biome fixes). There is no frontend test runner yet. A UI change is only verified in `pnpm tauri dev`: say what you exercised and what you did not.
+`pnpm typecheck` and `pnpm check` (run `pnpm fix` to apply Biome fixes). Pure logic (reducers, grouping, schemas) gets a colocated Vitest `*.test.ts` (`pnpm test`); keep it out of components so it stays testable. A UI change is only verified in `pnpm tauri dev`: say what you exercised and what you did not.

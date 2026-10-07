@@ -1,7 +1,7 @@
+use crate::storage::{codec::Codec, error::StoreError};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{de::DeserializeOwned, Serialize};
-use crate::storage::{codec::Codec, error::StoreError};
 
 pub struct AtomicFileStore<T, C: Codec> {
     path: PathBuf,
@@ -44,7 +44,7 @@ where
             })?;
         }
 
-        let encoded = C::encode(value)?;
+        let encoded = C::encode(value, &self.path)?;
 
         // Atomic write: write to a temp file, then rename.
         // If the app crashes mid-write, the real config file is untouched —
@@ -80,16 +80,12 @@ where
     }
 }
 
-/**
- * UNIT TESTS
- */
-
 #[cfg(test)]
 mod tests {
-    use crate::config::AppConfig;
-    use crate::storage::codec::TomlCodec;
     use super::*;
-    
+    use crate::config::{AppConfig, Theme};
+    use crate::storage::codec::TomlCodec;
+
     #[test]
     fn load_returns_none_when_file_does_not_exist() {
         let dir = tempfile::tempdir().unwrap();
@@ -100,14 +96,17 @@ mod tests {
 
         assert_eq!(result, None);
     }
-    
+
     #[test]
     fn save_then_load_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let store: AtomicFileStore<AppConfig, TomlCodec> =
             AtomicFileStore::new(dir.path().join("config.toml"));
 
-        let config = AppConfig { theme: "dark".to_string(), username: "toto".to_string() };
+        let config = AppConfig {
+            theme: Theme::Dark,
+            username: "toto".to_string(),
+        };
         store.save(&config).unwrap();
 
         let loaded = store.load().unwrap();
@@ -134,10 +133,12 @@ mod tests {
         let store: AtomicFileStore<AppConfig, TomlCodec> =
             AtomicFileStore::new(dir.path().join("config.toml"));
 
-        let updated = store.update(|config| {
-            config.theme = "light".to_string();
-        }).unwrap();
+        let updated = store
+            .update(|config| {
+                config.theme = Theme::Light;
+            })
+            .unwrap();
 
-        assert_eq!(updated.theme, "light");
+        assert_eq!(updated.theme, Theme::Light);
     }
 }

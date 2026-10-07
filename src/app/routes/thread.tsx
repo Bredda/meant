@@ -12,7 +12,6 @@ export function ThreadPage() {
 
   useEffect(() => {
     hydrate(thread, loadedMessages);
-    console.debug("Received messages", loadedMessages);
   }, [thread, hydrate, loadedMessages]);
   return (
     <div className="h-full min-h-0">

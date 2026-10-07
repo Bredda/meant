@@ -43,14 +43,15 @@ Thread Provider (React)
 
 A **run** is one execution of the agent against a thread, triggered by a new user message.
 
-1. The thread is resolved (existing, or created for a first message).
-2. The user message is persisted immediately, before the model is called.
-3. The full message history is loaded and handed to the agent.
-4. The agent streams the model's response, executing tools as needed, until it produces a final answer.
-5. Everything the run produced (assistant text, tool calls, tool results) is persisted.
-6. The UI is given the authoritative, persisted version of what happened.
+1. The thread is resolved (existing, or created for a first message) and the provider chosen. A missing key fails here, before anything is written.
+2. The run is recorded in the `runs` table as `running`.
+3. The user message is persisted immediately, before the model is called.
+4. The full message history is loaded and handed to the agent.
+5. The agent streams the model's response, executing tools as needed, until it produces a final answer.
+6. Everything the run produced (assistant text, tool calls, tool results) is persisted in one transaction.
+7. The UI is given the authoritative, persisted version of what happened, and the run is closed as `completed`, or as `failed` with its error.
 
-This lifecycle is intentionally linear: persistence of the user message happens *before* the model runs, and persistence of everything else happens *after* the run completes, in one batch.
+This lifecycle is intentionally linear: persistence of the user message happens *before* the model runs, and persistence of everything else happens *after* the run completes, all or nothing. A failed run therefore leaves the user message and a `failed` run row; text streamed before the failure is not stored. On a failure the UI reloads the thread's rows and keeps the error warning after them.
 
 ---
 
@@ -77,7 +78,7 @@ A single run can contain **multiple assistant text segments**, interleaved with 
 Two events act as terminals for the whole run:
 
 - **`RunCompleted`** — the run finished normally. It carries the complete, persisted list of messages produced by the run, which the UI treats as authoritative.
-- **`Error`** — the run failed. The UI surfaces this without a persisted result to reconcile against.
+- **`Error`** — the run failed. It carries a `kind` (`provider` for a failed completion: rejected key, network, rate limit; `internal` otherwise) and a message. It is emitted once, by `RunService`; the UI ignores the matching `invoke` rejection.
 
 ---
 
@@ -119,7 +120,9 @@ The distinction between the two, and how it's surfaced to the UI (e.g. visually 
 
 ## 6. Current Status & Open Questions
 
-- Tool-call failure signaling to the UI (`is_error`) is defined in the event model but not yet backed by a consistent convention across native tools.
+- Tool results are stored and replayed as plain text (the concatenated text parts of the tool output).
+- Tool-call failure signaling to the UI (`isError`) is defined in the event model but not yet backed by a consistent convention across native tools.
 - Multi-turn behavior when a tool itself errors out (does it end the run, or let the model retry?) is still being validated against Rig's actual behavior.
+- Runs are persisted (status, provider, model, error) but not yet shown in the UI, and a run cannot be cancelled.
 
 This document reflects the target shape of the agent boundary; implementation details (event payload shapes, exact Rig APIs) live in code, not here.

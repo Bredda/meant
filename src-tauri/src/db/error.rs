@@ -1,12 +1,8 @@
-
-use std::path::PathBuf;
-
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
-    #[error("failed to read {path}: {source}")]
-    Connect {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
+    #[error("database error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("database lock poisoned by an earlier panic")]
+    Poisoned,
 }

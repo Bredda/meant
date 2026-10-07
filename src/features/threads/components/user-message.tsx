@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Clipboardbutton } from "@/components/clipboard-button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ClipboardButton } from "@/components/clipboard-button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
   Message,
@@ -11,16 +11,19 @@ import {
 } from "@/components/ui/message";
 import type { ThreadUserMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useConfigStore } from "@/stores/config-store";
 
 export function UserMessage({ message }: { message: ThreadUserMessage }) {
   const [copied, setCopied] = useState(false);
+  const initials = useConfigStore(
+    (s) => s.config?.username.slice(0, 2).toUpperCase() ?? ""
+  );
 
   return (
     <Message align="end" className="group/message">
       <MessageAvatar>
         <Avatar>
-          <AvatarImage alt="@shadcn" src="https://github.com/shadcn.png" />
-          <AvatarFallback>CN</AvatarFallback>
+          <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
       </MessageAvatar>
       <MessageContent>
@@ -35,9 +38,8 @@ export function UserMessage({ message }: { message: ThreadUserMessage }) {
             copied && "opacity-100"
           )}
         >
-          <Clipboardbutton
+          <ClipboardButton
             content={message.content}
-            copied={copied}
             onCopiedChanged={setCopied}
           />
         </MessageFooter>

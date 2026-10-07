@@ -1,0 +1,78 @@
+import { describe, expect, it } from "vitest";
+import type { ThreadMessage } from "@/lib/types";
+import { groupMessages } from "./utils";
+
+const base = { position: 0, threadId: "t1" };
+
+const user = (id: string): ThreadMessage => ({
+  ...base,
+  id,
+  role: "user",
+  content: id,
+});
+const assistant = (id: string): ThreadMessage => ({
+  ...base,
+  id,
+  role: "assistant",
+  content: id,
+});
+const call = (callId: string): ThreadMessage => ({
+  ...base,
+  id: `row-${callId}`,
+  role: "tool_call",
+  toolCallId: callId,
+  toolName: "echo",
+  content: "{}",
+});
+const result = (callId: string): ThreadMessage => ({
+  ...base,
+  id: `row-${callId}-result`,
+  role: "tool_result",
+  toolCallId: callId,
+  toolName: "echo",
+  content: '"ok"',
+});
+
+describe("groupMessages", () => {
+  it("keeps user and assistant messages as message items", () => {
+    const items = groupMessages([user("u1"), assistant("a1")]);
+
+    expect(items.map((i) => i.kind)).toEqual(["message", "message"]);
+    expect(items.map((i) => i.key)).toEqual(["u1", "a1"]);
+  });
+
+  it("pairs a tool call with its result into one tool item", () => {
+    const items = groupMessages([user("u1"), call("c1"), result("c1")]);
+
+    expect(items).toHaveLength(2);
+    const tool = items[1];
+    expect(tool?.kind).toBe("tool");
+    if (tool?.kind === "tool") {
+      expect(tool.key).toBe("c1");
+      expect(tool.result?.content).toBe('"ok"');
+    }
+  });
+
+  it("leaves a pending tool call without result", () => {
+    const items = groupMessages([user("u1"), call("c1")]);
+    const tool = items[1];
+
+    expect(tool?.kind === "tool" && tool.result).toBeUndefined();
+  });
+
+  it("ignores a result without a matching call", () => {
+    const items = groupMessages([user("u1"), result("c9")]);
+
+    expect(items).toHaveLength(1);
+  });
+});
+
+describe("groupMessages with a tool call first", () => {
+  it("attaches the result when the call is the first item", () => {
+    const items = groupMessages([call("c1"), result("c1")]);
+    const tool = items[0];
+
+    expect(items).toHaveLength(1);
+    expect(tool?.kind === "tool" && tool.result?.content).toBe('"ok"');
+  });
+});

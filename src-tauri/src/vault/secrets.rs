@@ -15,6 +15,14 @@ pub enum ProviderId {
 impl ProviderId {
     pub const ALL: [ProviderId; 2] = [ProviderId::Anthropic, ProviderId::OpenAi];
 
+    /// Stable id, the same string the UI uses (serde form).
+    pub fn id(self) -> &'static str {
+        match self {
+            ProviderId::Anthropic => "anthropic",
+            ProviderId::OpenAi => "openai",
+        }
+    }
+
     /// Entry name under which the key is stored in the OS vault.
     pub fn secret_key(self) -> &'static str {
         match self {

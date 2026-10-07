@@ -5,7 +5,7 @@ description: How a Meant agent run works end to end — provider/agent construct
 
 # Meant agent run
 
-`reference/agents.md` is the design (lifecycle, event model, snapshot + replace). Read it first. This skill maps it onto the code.
+`reference/agent-runtime.md` is the design (lifecycle, event model, snapshot + replace). Read it first. This skill maps it onto the code.
 
 ## The pipeline
 
@@ -14,12 +14,16 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
   └─ invoke("chat", { request: { threadId, input }, channel })
        commands/chat.rs
          ├─ resolve or create thread (emits ThreadCreated)
-         ├─ persist the user message
-         ├─ load history → Vec<ThreadMessage>
-         ├─ state.default_provider() → state.agent(provider)   (cached, built from the vault)
-         ├─ RunService::run → ReActAgent::run                  (streams events)
-         ├─ persist produced messages (assistant / tool_call / tool_result)
-         └─ emit RunCompleted { messages: persisted rows incl. the user message }
+         ├─ state.default_provider()                         (fails before anything is written)
+         ├─ threads.start_run → runs row `running`
+         ├─ execute_run:
+         │    ├─ persist the user message (with run_id)
+         │    ├─ load history → Vec<ThreadMessage>
+         │    ├─ state.agent(provider)                         (cached, built from the vault)
+         │    ├─ RunService::run → ReActAgent::run             (streams events)
+         │    ├─ threads.append_messages (one transaction)
+         │    └─ emit RunCompleted { messages: persisted rows incl. the user message }
+         └─ threads.finish_run → `completed` or `failed` + error
 ```
 
 ## Invariants (do not break)
@@ -27,12 +31,12 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
 - **Assistant segment ids** are created at `MessageStarted` and reused as the stored row id. One run can produce several segments (text → tool call → text). `close_current_message!` closes a segment before each tool call and at the end.
 - **Tool calls are matched by `tool_call_id`**, never by row id.
 - **RunCompleted is authoritative**: the UI sets `messages = [...preRunSnapshot, ...event.data.messages]` and drops the live view. Anything the live view shows must be derivable from persisted rows after completion.
-- **Events are ordered per run** and carry `run_id` and `thread_id`. The UI must ignore events for a thread it is no longer showing (bug tracked in `fixes.md`).
-- **Errors are emitted once.** Today `react.rs`, `RunService` and the `invoke` rejection can all surface the same failure (see `fixes.md`). Target: `RunService` emits `Error`; the runtime only returns `Err`; the UI ignores the `invoke` rejection if an `Error` event already ended the run.
+- **Events are ordered per run** and carry `runId` and `threadId`. A run remembers its own thread; when the user opens another one, `isRunDisplayed` (`run-reducer.ts`) keeps its events away from the displayed messages, and only the run lifecycle (busy, end, list refresh) is applied.
+- **Errors are emitted once.** `RunService` emits `Error` (with a `kind`); the runtime only returns `Err`; the UI ignores the `invoke` rejection once an `Error` event ended the run. After a failure the UI reloads the persisted rows and keeps the warning (`reloadAfterFailure`).
 
 ## Changing an event or message shape
 
-Rust `AgentEvent` / `StoredThreadMessage` (serde: `tag = "type", content = "data"`) and `src/lib/types.ts` must change together, plus every `case` in `thread-context.tsx`. Field casing on the wire is currently mixed (camelCase `Thread`, snake_case events and messages); do not add a third convention — follow the decision in `fixes.md`.
+Rust `AgentEvent` / `StoredThreadMessage` (serde: `tag = "type", content = "data"`) and `src/lib/types.ts` must change together, plus every `case` in `thread-context.tsx`. Everything on the wire is camelCase (`rename_all` on structs, `rename_all_fields` on `AgentEvent`); `ipc_payloads_are_camel_case` in `types.rs` pins it.
 
 ## Providers (`ai/provider.rs`)
 
@@ -45,7 +49,7 @@ Rust `AgentEvent` / `StoredThreadMessage` (serde: `tag = "type", content = "data
 
 1. `src-tauri/src/ai/tools/<name>.rs` with `#[rig::tool_macro(description = "...", required(...))]` on an `async fn` returning `Result<T, ToolError>` (see `echo.rs`). Add `pub mod` in `tools/mod.rs`.
 2. Register it with `.tool(...)` on **every** provider branch in `provider.rs`.
-3. Decide its failure contract (see `reference/agents.md` §5): a recoverable failure should come back as a result the model can read; a fatal one returns `Err`. `is_error` is not wired yet (always `false`).
+3. Decide its failure contract (see `reference/agent-runtime.md` §5): a recoverable failure should come back as a result the model can read; a fatal one returns `Err`. `is_error` is not wired yet (always `false`).
 4. Tools that touch the filesystem, shell or network need an explicit permission story first (roadmap axis "Outils"): do not add one without it.
 5. Test the pure part of the tool in its module.
 

@@ -10,11 +10,14 @@ pub struct Thread {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StoredThreadMessage {
     pub id: String,
     pub position: i64,
     pub created_at: i64,
     pub thread_id: String,
+    /// The run that produced this message; `None` for rows older than runs.
+    pub run_id: Option<String>,
 
     /// user | assistant | tool_call | tool_result
     pub role: String,
@@ -29,7 +32,23 @@ pub struct StoredThreadMessage {
 
     /// Tool name for tool_call/tool_result messages.
     pub tool_name: Option<String>,
+}
 
+/// A message to insert; position and timestamps are assigned by the repository.
+#[derive(Debug, Clone)]
+pub struct NewMessage {
+    pub id: String,
+    /// user | assistant | tool_call | tool_result
+    pub role: &'static str,
+    pub content: String,
+    pub tool_call_id: Option<String>,
+    pub tool_name: Option<String>,
+}
 
-
+#[derive(Debug, Clone)]
+pub struct NewRun {
+    pub id: String,
+    pub thread_id: String,
+    pub provider: String,
+    pub model: String,
 }

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 import { PROVIDERS, type ProviderId } from "@/config/providers";
 import { useSecrets } from "@/hooks/use-secrets";
+import { errorMessage } from "@/lib/errors";
 
 export function ProvidersForm() {
   const { statuses, error, setSecret, deleteSecret } = useSecrets();
@@ -67,7 +68,7 @@ export function ProvidersForm() {
       setFieldError(provider, null);
       toast.success(`${config.name} key saved`);
     } catch (err) {
-      setFieldError(provider, String(err));
+      setFieldError(provider, errorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -81,7 +82,7 @@ export function ProvidersForm() {
       setFieldError(provider, null);
       toast.success(`${config?.name} key removed`);
     } catch (err) {
-      setFieldError(provider, String(err));
+      setFieldError(provider, errorMessage(err));
     } finally {
       setBusy(null);
     }

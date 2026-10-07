@@ -1,6 +1,6 @@
 import { IdCard } from "lucide-react";
 import { useState } from "react";
-import { ClipboardButton } from "@/components/content-clipboard-button";
+import { ClipboardButton } from "@/components/clipboard-button";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -37,17 +37,9 @@ export function LocalInfos({ thread }: { thread: Thread }) {
               className="flex-1"
               content={thread.id}
               variant="secondary"
-            />
-          </div>
-          <div className="flex w-full items-center gap-2">
-            <span className="max-w-[80px] text-muted-foreground text-sm">
-              Path
-            </span>
-            <ClipboardButton
-              className="flex-1"
-              content="to be done"
-              variant="secondary"
-            />
+            >
+              {(copied) => (copied ? "copied" : thread.id)}
+            </ClipboardButton>
           </div>
         </div>
       </PopoverContent>

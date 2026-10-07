@@ -3,10 +3,11 @@
 
 mod ai;
 mod commands;
-mod db;
-mod state;
-mod runs;
 mod config;
+mod db;
+mod error;
+mod runs;
+mod state;
 mod storage;
 mod vault;
 
@@ -15,19 +16,10 @@ use tauri::Manager;
 use db::ThreadRepository;
 use state::AppState;
 
-use crate::{
-    config::config_store,
-    vault::keyring_store::KeyringStore,
-};
+use crate::{config::config_store, vault::keyring_store::KeyringStore};
 
 fn main() {
-     #[cfg(debug_assertions)]
-    {
-        dotenvy::dotenv().ok();
-    }
-
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
@@ -45,7 +37,6 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat,
-            commands::get_thread_messages::get_thread_messages,
             commands::list_threads::list_threads,
             commands::get_thread::get_thread,
             commands::update_config::update_config,
@@ -54,9 +45,7 @@ fn main() {
             commands::secrets::list_secrets,
             commands::secrets::set_secret,
             commands::secrets::delete_secret
-            ]
-        
-        )
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUpdateConfig } from "@/hooks/use-config-update";
+import { errorMessage } from "@/lib/errors";
 import { type PreferencesValues, preferencesSchema } from "@/lib/schemas";
 import { useConfigStore } from "@/stores/config-store";
 
@@ -45,11 +46,11 @@ export function PreferencesForm() {
     onSubmit: async ({ value }) => {
       setBackError(null);
       try {
-        await update({ theme: value.theme as Theme, username: value.username });
+        await update({ theme: value.theme, username: value.username });
         toast.success("Preferences saved");
       } catch (_error) {
         console.error(_error);
-        setBackError(_error as unknown as string);
+        setBackError(errorMessage(_error));
       }
     },
   });
@@ -99,7 +100,7 @@ export function PreferencesForm() {
                         name={field.name}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="shadcn"
+                        placeholder="your_name"
                         value={field.state.value}
                       />
                     </Field>
@@ -117,7 +118,7 @@ export function PreferencesForm() {
                       <FieldContent>
                         <FieldLabel htmlFor="select-theme">Theme</FieldLabel>
                         <FieldDescription>
-                          Select your prefered theme.
+                          Select your preferred theme.
                         </FieldDescription>
                         {isInvalid && (
                           <FieldError errors={field.state.meta.errors} />
@@ -125,7 +126,9 @@ export function PreferencesForm() {
                       </FieldContent>
                       <Select
                         name={field.name}
-                        onValueChange={field.handleChange}
+                        onValueChange={(value) =>
+                          field.handleChange(value as Theme)
+                        }
                         value={field.state.value}
                       >
                         <SelectTrigger

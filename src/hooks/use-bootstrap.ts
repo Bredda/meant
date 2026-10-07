@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import type { AppConfig } from "@/lib/types";
 import { useConfigStore } from "@/stores/config-store";
 
@@ -37,7 +38,7 @@ export function useBootstrap() {
       } catch (err) {
         // The vault is a hard requirement: without it no API key can be
         // stored, so there is nothing to fall back to.
-        setState({ step: "vault", status: "error", reason: String(err) });
+        setState({ step: "vault", status: "error", reason: errorMessage(err) });
         return;
       }
 
@@ -51,7 +52,11 @@ export function useBootstrap() {
           setState({ step: "done", status: "done", progress: 100 });
         }
       } catch (err) {
-        setState({ step: "config", status: "error", reason: String(err) });
+        setState({
+          step: "config",
+          status: "error",
+          reason: errorMessage(err),
+        });
       }
     }
 

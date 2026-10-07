@@ -9,7 +9,7 @@ export const preferencesSchema = z.object({
       /^[a-zA-Z0-9_]+$/,
       "Username can only contain letters, numbers, and underscores."
     ),
-  theme: z.string(),
+  theme: z.enum(["light", "dark", "system"]),
 });
 
 export type PreferencesValues = z.infer<typeof preferencesSchema>;

@@ -33,11 +33,11 @@ export function ToolCallItem({
         )}
 
         <span className="font-mono text-muted-foreground text-xs">
-          {call.tool_name}
+          {call.toolName}
         </span>
 
         <span className="ml-auto text-muted-foreground text-xs">
-          {isPending ? "en cours…" : "terminé"}
+          {isPending ? "running…" : "done"}
         </span>
       </button>
 
@@ -55,7 +55,7 @@ export function ToolCallItem({
           {result && (
             <div>
               <div className="mb-1 font-medium text-muted-foreground text-xs">
-                Résultat
+                Result
               </div>
               <pre className="overflow-x-auto rounded bg-background p-2 text-xs">
                 {formatJson(result.content)}

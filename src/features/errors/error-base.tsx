@@ -11,12 +11,12 @@ export function ErrorView({
   return (
     <main
       className={cn(
-        "flex h-full flex-col items-center justify-center bg-red-50 p-8 text-center",
+        "flex h-full flex-col items-center justify-center bg-background p-8 text-center",
         className
       )}
     >
       <div className="text-center">
-        <p className="font-semibold text-base text-red-600">Error</p>
+        <p className="font-semibold text-base text-destructive">Error</p>
         {children}
       </div>
     </main>
@@ -33,7 +33,7 @@ export function ErrorHeader({
   return (
     <h1
       className={cn(
-        "mt-4 font-bold text-3xl text-gray-900 tracking-tight sm:text-5xl",
+        "mt-4 font-bold text-3xl text-foreground tracking-tight sm:text-5xl",
         className
       )}
     >
@@ -50,7 +50,12 @@ export function ErrorDescription({
   className?: string;
 }) {
   return (
-    <p className={cn("mt-6 text-base text-gray-600 leading-7", className)}>
+    <p
+      className={cn(
+        "mt-6 text-base text-muted-foreground leading-7",
+        className
+      )}
+    >
       {children}
     </p>
   );

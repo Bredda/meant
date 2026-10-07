@@ -3,10 +3,18 @@ use rig::providers::{anthropic, openai};
 
 use crate::ai::agent::runtime::AgentError;
 use crate::ai::tools::echo::Echo;
-use crate::vault::SecretStore;
 use crate::vault::secrets::ProviderId;
+use crate::vault::SecretStore;
 
 const PREAMBLE: &str = "You are a helpful assistant. Answer clearly and concisely.";
+
+/// The model each provider runs, until model selection exists (roadmap axis 4).
+pub fn model_id(provider: ProviderId) -> &'static str {
+    match provider {
+        ProviderId::Anthropic => anthropic::completion::CLAUDE_SONNET_4_6,
+        ProviderId::OpenAi => openai::completion::GPT_5_1,
+    }
+}
 
 /// Builds a fully-configured agent for `provider`, fetching its key from the
 /// vault itself — callers never see or thread key material through.
@@ -33,20 +41,20 @@ pub fn build_agent<S: SecretStore>(
 
     let agent = match provider {
         ProviderId::Anthropic => {
-            let client = anthropic::Client::new(&key)
-                .map_err(|e| AgentError::Provider(e.to_string()))?;
+            let client =
+                anthropic::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
             client
-                .agent(anthropic::completion::CLAUDE_SONNET_4_6)
+                .agent(model_id(provider))
                 .preamble(PREAMBLE)
                 .default_max_turns(5)
                 .tool(Echo)
                 .build()
         }
         ProviderId::OpenAi => {
-            let client = openai::Client::new(&key)
-                .map_err(|e| AgentError::Provider(e.to_string()))?;
+            let client =
+                openai::Client::new(&key).map_err(|e| AgentError::Provider(e.to_string()))?;
             client
-                .agent(openai::completion::GPT_5_1)
+                .agent(model_id(provider))
                 .preamble(PREAMBLE)
                 .default_max_turns(5)
                 .tool(Echo)

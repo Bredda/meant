@@ -1,35 +1,16 @@
 use futures::StreamExt;
 use rig::{
-    agent::{
-        MultiTurnStreamItem
-    },
+    agent::MultiTurnStreamItem,
+    completion::{message::UserContent, AssistantContent, Message},
     message::ToolResultContent,
-    streaming::{
-        StreamedAssistantContent,
-        StreamedUserContent::ToolResult,
-        StreamingChat,
-    },
-    completion::{
-        AssistantContent,
-        Message,
-        message::UserContent,
-    }
+    streaming::{StreamedAssistantContent, StreamedUserContent::ToolResult, StreamingChat},
 };
 
-use crate::runs::service::Run;
 use super::{
-    types::{
-        AgentEvent, 
-        ThreadMessage
-    },
-    runtime::{
-        AgentContext,
-        AgentEmitter,
-        AgentError,
-        RunResult,
-        AgentRuntime,
-    }
+    runtime::{AgentContext, AgentEmitter, AgentError, AgentRuntime, RunResult},
+    types::{AgentEvent, ThreadMessage},
 };
+use crate::runs::service::Run;
 
 pub struct ReActAgent {
     agent: rig::agent::Agent,
@@ -79,16 +60,10 @@ impl AgentRuntime for ReActAgent {
 
         emit(AgentEvent::RunStarted {
             run_id: run.id.clone(),
-            thread_id: run.thread_id.clone()
+            thread_id: run.thread_id.clone(),
         });
 
-        let mut stream = self
-            .agent
-            .stream_chat(
-                prompt,
-                chat_history,
-            )
-            .await;
+        let mut stream = self.agent.stream_chat(prompt, chat_history).await;
 
         let mut produced_messages: Vec<ThreadMessage> = vec![];
         let mut current_message: Option<(String, String)> = None; // (message_id, buffer)
@@ -110,55 +85,49 @@ impl AgentRuntime for ReActAgent {
         }
 
         while let Some(item) = stream.next().await {
-
             let item = match item {
                 Ok(item) => item,
-                Err(e) => {
-                    emit(AgentEvent::Error {
-                        run_id: run.id.clone(),
-                        thread_id: Some(run.thread_id.clone()),
-                        message: e.to_string(),
-                    });
-                    return Err(AgentError::Runtime(e.to_string()));
-                }
+                // RunService reports the failure to the UI; emitting here too
+                // would show the same error twice.
+                Err(e) => return Err(stream_error(e)),
             };
 
             match item {
-
-                MultiTurnStreamItem::StreamAssistantItem(content) => {
-                    match content {
-                        StreamedAssistantContent::Text(text) => {
-                            let message_id = match &current_message {
-                                Some((id, _)) => id.clone(),
-                                None => {
-                                    let id = uuid::Uuid::new_v4().to_string();
-                                    emit(AgentEvent::MessageStarted {
-                                        run_id: run.id.clone(),
-                                        thread_id: run.thread_id.clone(),
-                                        message_id: id.clone(),
-                                    });
-                                    current_message = Some((id.clone(), String::new()));
-                                    id
-                                }
-                            };
-
-                            if let Some((_, buf)) = current_message.as_mut() {
-                                buf.push_str(&text.text);
+                MultiTurnStreamItem::StreamAssistantItem(content) => match content {
+                    StreamedAssistantContent::Text(text) => {
+                        let message_id = match &current_message {
+                            Some((id, _)) => id.clone(),
+                            None => {
+                                let id = uuid::Uuid::new_v4().to_string();
+                                emit(AgentEvent::MessageStarted {
+                                    run_id: run.id.clone(),
+                                    thread_id: run.thread_id.clone(),
+                                    message_id: id.clone(),
+                                });
+                                current_message = Some((id.clone(), String::new()));
+                                id
                             }
+                        };
 
-                            emit(AgentEvent::MessageDelta {
-                                run_id: run.id.clone(),
-                                thread_id: run.thread_id.clone(),
-                                message_id,
-                                text: text.text,
-                            });
+                        if let Some((_, buf)) = current_message.as_mut() {
+                            buf.push_str(&text.text);
                         }
-                        StreamedAssistantContent::ToolCallDelta { .. } => {}
-                        _ => {}
-                    }
-                }
 
-                MultiTurnStreamItem::ToolExecutionCommitted { tool_call, internal_call_id } => {
+                        emit(AgentEvent::MessageDelta {
+                            run_id: run.id.clone(),
+                            thread_id: run.thread_id.clone(),
+                            message_id,
+                            text: text.text,
+                        });
+                    }
+                    StreamedAssistantContent::ToolCallDelta { .. } => {}
+                    _ => {}
+                },
+
+                MultiTurnStreamItem::ToolExecutionCommitted {
+                    tool_call,
+                    internal_call_id,
+                } => {
                     close_current_message!(); // ferme le segment texte s'il y en avait un avant l'appel d'outil
 
                     produced_messages.push(ThreadMessage::ToolCall {
@@ -176,25 +145,24 @@ impl AgentRuntime for ReActAgent {
                     });
                 }
 
-                MultiTurnStreamItem::StreamUserItem(ToolResult { 
-                    tool_result, 
-                    internal_call_id 
+                MultiTurnStreamItem::StreamUserItem(ToolResult {
+                    tool_result,
+                    internal_call_id,
                 }) => {
-                    let content_value = serde_json::to_value(&tool_result.content)
-                        .map_err(|e| AgentError::Runtime(e.to_string()))?;
+                    let content = tool_result_text(&tool_result.content);
 
                     produced_messages.push(ThreadMessage::ToolResult {
                         id: uuid::Uuid::new_v4().to_string(),
                         tool_call_id: internal_call_id.clone(),
                         tool_name: tool_result.name.clone(),
-                        content: content_value.clone(),
+                        content: content.clone(),
                     });
                     emit(AgentEvent::ToolCallCompleted {
                         run_id: run.id.clone(),
                         thread_id: run.thread_id.clone(),
                         tool_name: tool_result.name.clone(),
                         tool_call_id: internal_call_id.clone(),
-                        content: content_value.to_string(),
+                        content,
                         is_error: false,
                     });
                 }
@@ -204,7 +172,7 @@ impl AgentRuntime for ReActAgent {
                 _ => {}
             }
         }
-        
+
         // Close last segment if exists
         close_current_message!();
 
@@ -214,44 +182,30 @@ impl AgentRuntime for ReActAgent {
     }
 }
 
-fn to_rig_message(
-    message: &ThreadMessage,
-) -> Result<Message, AgentError> {
+fn to_rig_message(message: &ThreadMessage) -> Result<Message, AgentError> {
     match message {
-        ThreadMessage::User { content, .. } => {
-            Ok(Message::User {
-                content: vec![
-                    UserContent::text(content.clone())
-                ],
-            })
-        }
+        ThreadMessage::User { content, .. } => Ok(Message::User {
+            content: vec![UserContent::text(content.clone())],
+        }),
 
-        ThreadMessage::Assistant { content, .. } => {
-            Ok(Message::Assistant {
-                id: None,
-                content: vec![
-                    AssistantContent::text(content.clone())
-                ],
-            })
-        }
+        ThreadMessage::Assistant { content, .. } => Ok(Message::Assistant {
+            id: None,
+            content: vec![AssistantContent::text(content.clone())],
+        }),
 
         ThreadMessage::ToolCall {
             tool_call_id,
             tool_name,
             arguments,
             ..
-        } => {
-            Ok(Message::Assistant {
-                id: None,
-                content: vec![
-                    AssistantContent::tool_call(
-                        tool_call_id.clone(),
-                        tool_name.clone(),
-                        arguments.clone(),
-                    ),
-                ],
-            })
-        }
+        } => Ok(Message::Assistant {
+            id: None,
+            content: vec![AssistantContent::tool_call(
+                tool_call_id.clone(),
+                tool_name.clone(),
+                arguments.clone(),
+            )],
+        }),
 
         ThreadMessage::ToolResult {
             tool_call_id,
@@ -262,8 +216,71 @@ fn to_rig_message(
             content: vec![UserContent::tool_result(
                 tool_call_id.clone(),
                 tool_name.clone(),
-                vec![ToolResultContent::text(content.to_string())],
+                vec![ToolResultContent::text(content.clone())],
             )],
         }),
+    }
+}
+
+/// Flattens a tool's output to the text replayed to the model on later turns
+/// and shown in the UI. Storing rig's own serialization instead would make the
+/// model read `[{"type":"text",...}]` rather than the tool's answer.
+fn tool_result_text(content: &[ToolResultContent]) -> String {
+    content
+        .iter()
+        .map(|part| match part {
+            ToolResultContent::Text(text) => text.text.clone(),
+            ToolResultContent::Json { value } => value.to_string(),
+            ToolResultContent::Image(_) => "[image]".to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A failed completion means the provider could not be used (rejected key,
+/// network, rate limit): the UI points the user to Settings for those.
+fn stream_error(error: rig::agent::StreamingError) -> AgentError {
+    use rig::{agent::StreamingError, completion::PromptError};
+
+    match error {
+        StreamingError::Completion(_) => AgentError::Provider(error.to_string()),
+        StreamingError::Prompt(ref prompt)
+            if matches!(**prompt, PromptError::CompletionError(_)) =>
+        {
+            AgentError::Provider(error.to_string())
+        }
+        StreamingError::Prompt(_) => AgentError::Runtime(error.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_result_text_joins_parts_as_plain_text() {
+        let content = vec![
+            ToolResultContent::text("hello"),
+            ToolResultContent::Json {
+                value: serde_json::json!({ "n": 1 }),
+            },
+        ];
+
+        assert_eq!(tool_result_text(&content), "hello\n{\"n\":1}");
+    }
+
+    #[test]
+    fn tool_result_replays_its_text_to_the_model() {
+        let message = ThreadMessage::ToolResult {
+            id: "m1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "echo".into(),
+            content: "hello".into(),
+        };
+
+        let replayed = serde_json::to_string(&to_rig_message(&message).unwrap()).unwrap();
+
+        assert!(replayed.contains(r#""text":"hello""#), "{replayed}");
+        assert!(!replayed.contains(r#"\"text\""#), "{replayed}");
     }
 }

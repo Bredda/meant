@@ -26,8 +26,8 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 
 | # | Axe | Horizon | Statut |
 | --- | --- | --- | --- |
-| 1 | Socle du projet | En cours | Instructions agents, skills et hooks en place ; revue du code faite (`fixes.md`), corrections à valider puis appliquer |
-| 2 | Configuration et secrets | Fait | Assistant de premier lancement, préférences dans `config.toml`, clés Anthropic et OpenAI dans le vault, réglages. Sur une branche non fusionnée |
+| 1 | Socle du projet | En cours | Corrections de `fixes.md` appliquées (branche `fix/review-fixes`), vérifications et CI en place ; reste la vérification manuelle dans l’app (`todo.md`) |
+| 2 | Configuration et secrets | Fait | Assistant de premier lancement, préférences dans `config.toml`, clés Anthropic et OpenAI dans le vault, réglages. Fusionné, B5, R5 et S4 appliqués |
 | 3 | Conversations robustes | Ensuite | Streaming, persistance et appels d'outils fonctionnent ; manquent titres, gestion des fils, annulation, runs persistés |
 | 4 | Fournisseurs et modèles | Ensuite | Deux fournisseurs, modèle codé en dur, premier fournisseur configuré utilisé |
 | 5 | Outils natifs et permissions | Plus tard | Un outil de démonstration (`echo`), pas de modèle de permissions |
@@ -43,7 +43,7 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 
 Fait : `AGENTS.md` (et `CLAUDE.md`), skills `meant-core`, `meant-agent` et `meant-ui`, hook de formatage automatique, suivi du travail à quatre fichiers (`roadmap.md`, `todo.md`, `backlog.md`, `fixes.md`). Revue complète du code existant dans `fixes.md`.
 
-Reste : valider puis appliquer `fixes.md` (build TypeScript cassé, envoi de message cassé par `ChatRequest`, fins de ligne, bugs du streaming, CSP, migrations SQLite, erreurs typées, tests, CI). C'est le plan en cours (`todo.md`).
+Fait aussi : les 31 corrections de `fixes.md` (build, envoi de message, fins de ligne, bugs du streaming, CSP, migrations SQLite, table `runs`, erreurs typées, camelCase sur l'IPC, Vitest, CI). Reste : la vérification manuelle dans l'application listée dans `todo.md`, et un premier passage de la CI.
 
 **Terminé quand :** `pnpm typecheck`, `pnpm check`, `pnpm test`, `cargo clippy -- -D warnings` et `cargo test` passent en local et en CI, et `fixes.md` ne contient plus d'entrée en attente.
 
@@ -51,9 +51,9 @@ Reste : valider puis appliquer `fixes.md` (build TypeScript cassé, envoi de mes
 
 **But :** qu'un nouvel utilisateur configure l'application en une minute, sans jamais exposer une clé.
 
-Disponible (branche `feat/Vault-Access-#5`, non fusionnée) : écran d'amorçage (vault, configuration), assistant de premier lancement (nom, thème, au moins une clé), réglages (préférences, ajout, remplacement et suppression de clés avec au moins un fournisseur conservé), clés dans le vault du système, préférences dans `config.toml`, validation du format des clés côté UI et côté Rust.
+Disponible (fusionné dans `main`) : écran d'amorçage (vault, configuration), assistant de premier lancement (nom, thème, au moins une clé), réglages (préférences, ajout, remplacement et suppression de clés avec au moins un fournisseur conservé), clés dans le vault du système, préférences dans `config.toml`, validation du format des clés côté UI et côté Rust.
 
-**Terminé quand :** la branche est fusionnée et les corrections B5, R5 et S4 de `fixes.md` sont faites.
+**Terminé quand :** la branche est fusionnée et les corrections B5, R5 et S4 de `fixes.md` sont faites. Les trois conditions sont remplies.
 
 ## 3. Conversations robustes
 

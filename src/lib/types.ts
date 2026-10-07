@@ -1,10 +1,11 @@
+import type { AppErrorKind } from "./errors";
 export type AppConfig = {
   theme: "light" | "dark" | "system";
   username: string;
 };
 
 type BaseAgentEvent = {
-  data: { run_id: string };
+  data: { runId: string };
 };
 
 export type ThreadCreatedEvent = {
@@ -14,30 +15,30 @@ export type ThreadCreatedEvent = {
 
 export type RunStartedEvent = {
   type: "RunStarted";
-  data: { thread_id: string };
+  data: { threadId: string };
 } & BaseAgentEvent;
 
 export type MessageStartedEvent = {
   type: "MessageStarted";
-  data: { thread_id: string; message_id: string };
+  data: { threadId: string; messageId: string };
 } & BaseAgentEvent;
 
 export type MessageDeltaEvent = {
   type: "MessageDelta";
-  data: { thread_id: string; message_id: string; text: string };
+  data: { threadId: string; messageId: string; text: string };
 } & BaseAgentEvent;
 
 export type MessageCompletedEvent = {
   type: "MessageCompleted";
-  data: { thread_id: string; message_id: string };
+  data: { threadId: string; messageId: string };
 } & BaseAgentEvent;
 
 export type ToolCallStartedEvent = {
   type: "ToolCallStarted";
   data: {
-    thread_id: string;
-    tool_name: string;
-    tool_call_id: string;
+    threadId: string;
+    toolName: string;
+    toolCallId: string;
     arguments: string;
   };
 } & BaseAgentEvent;
@@ -45,22 +46,22 @@ export type ToolCallStartedEvent = {
 export type ToolCallCompletedEvent = {
   type: "ToolCallCompleted";
   data: {
-    thread_id: string;
-    tool_name: string;
-    tool_call_id: string;
+    threadId: string;
+    toolName: string;
+    toolCallId: string;
     content: string;
-    is_error: boolean;
+    isError: boolean;
   };
 } & BaseAgentEvent;
 
 export type RunCompletedEvent = {
   type: "RunCompleted";
-  data: { thread_id: string; messages: ThreadMessage[] };
+  data: { threadId: string; messages: ThreadMessage[] };
 } & BaseAgentEvent;
 
 export type ErrorEvent = {
   type: "Error";
-  data: { thread_id?: string; message: string };
+  data: { threadId?: string; kind: AppErrorKind; message: string };
 } & BaseAgentEvent;
 
 export type AgentEvent =
@@ -78,7 +79,9 @@ type ThreadBaseMessage = {
   id: string;
   position: number;
   createdAt?: number;
-  thread_id: string;
+  threadId: string;
+  /** Run that produced the row; absent on optimistic messages and old rows. */
+  runId?: string | null;
 };
 
 export type ThreadUserMessage = {
@@ -93,15 +96,15 @@ export type ThreadAssistantMessage = {
 
 export type ThreadToolCall = {
   role: "tool_call";
-  tool_call_id: string;
-  tool_name: string;
+  toolCallId: string;
+  toolName: string;
   content: string;
 } & ThreadBaseMessage;
 
 export type ThreadToolResult = {
   role: "tool_result";
-  tool_call_id: string;
-  tool_name: string;
+  toolCallId: string;
+  toolName: string;
   content: string;
 } & ThreadBaseMessage;
 

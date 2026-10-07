@@ -1,8 +1,7 @@
 use crate::ai::agent::{
-        runtime::{
-            AgentContext, AgentEmitter, AgentError,  AgentRuntime, RunResult,
-        }, types::{AgentEvent, ThreadMessage},
-    };
+    runtime::{AgentContext, AgentEmitter, AgentError, AgentRuntime, RunResult},
+    types::{AgentEvent, ThreadMessage},
+};
 
 use serde::Serialize;
 
@@ -12,6 +11,17 @@ pub enum RunStatus {
     Running,
     Completed,
     Failed,
+}
+
+impl RunStatus {
+    /// Value stored in `runs.status`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,28 +50,66 @@ where
         messages: Vec<ThreadMessage>,
         emit: AgentEmitter,
     ) -> Result<RunResult, AgentError> {
-        let context = AgentContext {
-            messages,
-        };
+        let context = AgentContext { messages };
 
-        match self
-            .agent
-            .run(&run, context, &emit)
-            .await
-        {
+        match self.agent.run(&run, context, &emit).await {
             Ok(result) => Ok(result),
 
+            // The single place a run failure reaches the UI: runtimes only
+            // return the error, and the frontend ignores the matching
+            // `invoke` rejection once this event has ended the run.
             Err(error) => {
                 emit(AgentEvent::Error {
                     run_id: run.id.clone(),
                     thread_id: Some(run.thread_id.clone()),
+                    kind: error.kind(),
                     message: error.to_string(),
                 });
-                return Err(AgentError::Runtime(
-                    format!("Unexpected error: {}!", error.to_string())
-                ));
+                Err(error)
             }
         }
     }
-    
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+
+    struct FailingRuntime;
+
+    #[async_trait::async_trait]
+    impl AgentRuntime for FailingRuntime {
+        async fn run(
+            &self,
+            _run: &Run,
+            _context: AgentContext,
+            _emit: &AgentEmitter,
+        ) -> Result<RunResult, AgentError> {
+            Err(AgentError::Provider("invalid key".into()))
+        }
+    }
+
+    #[test]
+    fn a_failed_run_emits_exactly_one_error_event() {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let emit: AgentEmitter = Box::new({
+            let events = Arc::clone(&events);
+            move |event| events.lock().unwrap().push(event)
+        });
+        let run = Run {
+            id: "r1".into(),
+            thread_id: "t1".into(),
+            status: RunStatus::Running,
+        };
+
+        let result =
+            tauri::async_runtime::block_on(RunService::new(FailingRuntime).run(run, vec![], emit));
+
+        assert!(matches!(result, Err(AgentError::Provider(_))));
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], AgentEvent::Error { .. }));
+    }
 }

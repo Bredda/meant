@@ -12,7 +12,6 @@ export type Theme = "dark" | "light" | "system";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  storageKey?: string;
 };
 
 type ThemeProviderState = {
@@ -37,7 +36,7 @@ function resolveTheme(theme: Theme): "dark" | "light" {
     : "light";
 }
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>("system");
   const updateConfig = useUpdateConfig();
   const configTheme = useConfigStore((s) => s.config?.theme);
@@ -84,7 +83,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   }, [theme]);
 
   return (
-    <ThemeProviderContext.Provider {...props} value={{ theme, applyTheme }}>
+    <ThemeProviderContext.Provider value={{ theme, applyTheme }}>
       {children}
     </ThemeProviderContext.Provider>
   );
