@@ -29,7 +29,7 @@ React decides what the user sees; Rust decides what the app does. No domain logi
 
 ## Forms
 
-TanStack Form (`@tanstack/react-form`) with a zod schema from `src/lib/schemas.ts` as validator, rendered with the shadcn `Field*` components (see `features/settings/preferences.tsx`). Validation in the form is a convenience; Rust re-validates (keys in `vault/secrets.rs`). Reuse schemas rather than redefining a rule (the username rule is duplicated today, see `fixes.md`). Show backend errors in an `Alert` or `FieldError`, successes with `toast` (sonner).
+TanStack Form (`@tanstack/react-form`) with a zod schema from `src/lib/schemas.ts` as validator, rendered with the shadcn `Field*` components (see `features/settings/preferences.tsx`). Validation in the form is a convenience; Rust re-validates (keys in `vault/secrets.rs`). Reuse schemas rather than redefining a rule (`splash-form.tsx` builds on `preferencesSchema.shape`); a rule enforced in Rust too (username in `config/model.rs`) changes on both sides. Show backend errors in an `Alert` or `FieldError`, successes with `toast` (sonner).
 
 ## Theme
 

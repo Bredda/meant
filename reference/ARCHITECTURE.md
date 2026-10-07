@@ -26,7 +26,7 @@ Meant is a **local-first AI workbench**. The desktop application runs primarily 
           │                              Git     Servers
           │                              Shell
           │
-    See AGENT.md
+    See agent-runtime.md
     for the agent
     execution model
 ```
@@ -81,7 +81,7 @@ Rust Domain Service
 
 The agent layer is responsible for turning a conversation into a model run: prompting, tool execution, and streaming the result back to the UI.
 
-This layer is documented separately in **[AGENT.md](./AGENT.md)**, which covers the run lifecycle, the streaming event model, and how tool calls are executed and surfaced.
+This layer is documented separately in **[agent-runtime.md](./agent-runtime.md)**, which covers the run lifecycle, the streaming event model, and how tool calls are executed and surfaced.
 
 At the architecture level, the important boundary is:
 
@@ -181,7 +181,7 @@ Agent
        └── MCP tool
 ```
 
-Tool execution details (error handling, native tool authoring) are covered in [AGENT.md](./AGENT.md).
+Tool execution details (error handling, native tool authoring) are covered in [agent-runtime.md](./agent-runtime.md).
 
 ---
 
@@ -272,7 +272,7 @@ Rust Agent
     └── Error ─────────────► React
 ```
 
-The full event model and the message-identity strategy that lets the UI reconcile live state with persisted state are documented in [AGENT.md](./AGENT.md).
+The full event model and the message-identity strategy that lets the UI reconcile live state with persisted state are documented in [agent-runtime.md](./agent-runtime.md).
 
 The UI buffers deltas before rendering when necessary to avoid excessive visual updates.
 
@@ -309,4 +309,4 @@ The architecture should evolve around three clear boundaries:
 
 **React decides what the user sees. Rust decides what the application does. Storage decides what persists. The agent decides how AI work is executed.**
 
-See [AGENT.md](./AGENT.md) for how the agent boundary itself is structured.
+See [agent-runtime.md](./agent-runtime.md) for how the agent boundary itself is structured.

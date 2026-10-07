@@ -17,17 +17,15 @@ Configuration in Meant follows the same local-first contract as the rest of the 
 
 ```text
 tauri::Builder.setup()
-        │
         ├── resolve app_data_dir
-        ├── ConfigStore::load()
-        │
-        ├── Ok(Some(config)) → emit "config-loaded"
-        ├── Ok(None)         → emit "config-missing"   (first-run)
-        └── Err(err)         → emit "config-error"
-        │
-        ▼
-   React: useConfigBootstrap()
-        │
+        └── manage AppState { config_store, vault, threads }
+
+React: useBootstrap()                      (src/hooks/use-bootstrap.ts)
+        ├── invoke("check_vault")  → Err → splash error, app stops here
+        ├── invoke("load_config")
+        │     ├── Some(config) → useConfigStore.setConfig → router mounts
+        │     ├── None         → first-run setup form (keys, then config.toml)
+        │     └── Err          → splash error (corrupted file)
         ▼
    useConfigStore (Zustand) ── read by any component, no prop drilling
 ```
@@ -76,26 +74,33 @@ Config (this document) and secrets (vault) are deliberately separate systems wit
 
 | | Config | Secrets |
 |---|---|---|
-| Storage | TOML file, app-data dir | OS-native credential store (Keychain / Credential Manager / Secret Service) |
-| Access | `AtomicFileStore` | `keyring`-backed wrapper |
-| Failure mode | first-run / corrupted-file handling | hard fail at startup, no fallback |
+| Storage | TOML file, app-data dir | OS-native credential store (Keychain / Credential Manager / Secret Service), service `meant` |
+| Access | `AtomicFileStore` | `SecretStore` trait, `KeyringStore` (`src-tauri/src/vault`) |
+| Failure mode | first-run / corrupted-file handling | hard fail at startup (`check_vault`), no fallback |
 
-No secret value is ever written through the config store, and the config `AppConfig` struct never gains a field intended to hold a credential. This boundary is enforced by convention at the call site (BYOK settings write only through the vault wrapper), not by a type-level guarantee.
+Rules of the vault boundary:
+
+- **Only known providers.** Entries are keyed by `ProviderId` (`anthropic`, `openai`), never by a free string from the UI. Each provider has a key format check, in Rust (`ProviderId::accepts`, the trust boundary) and mirrored in `src/config/providers.ts` for form feedback.
+- **Write-only from the UI.** `set_secret` and `delete_secret` write; `list_secrets` returns presence only. No command returns key material.
+- **At least one provider.** Setup requires one key, and `delete_secret` refuses to remove the last one.
+- **Keys take effect immediately.** Changing or deleting a key drops that provider's cached agent (`AppState::invalidate_agent`); the next run rebuilds it from the vault.
+
+No secret value is ever written through the config store, and `AppConfig` never gains a field intended to hold a credential.
 
 ---
 
 ## 5. Frontend Integration
 
-The config store is read into a dedicated Zustand store (`useConfigStore`), scoped to config only — mirroring the backend's separation of concerns (a future `useVaultStore`, `useCostStore` would follow the same pattern rather than a single monolithic app store).
+The config is read into a dedicated Zustand store (`useConfigStore`), scoped to config only, mirroring the backend's separation of concerns (vault presence lives in `useSecrets`, not in that store).
 
-A single bootstrap hook, mounted once near the app root, owns the Tauri event subscriptions (`config-loaded` / `config-missing` / `config-error`) and pushes results into the store via `getState()`. Components elsewhere in the tree read only the slice they need (`useConfigStore(s => s.config?.theme)`), so a config change only re-renders components actually depending on the changed field.
+`useBootstrap`, mounted once at the app root, runs the startup sequence above and fills the store. Components read only the slice they need (`useConfigStore(s => s.config?.theme)`). Writes go through `useUpdateConfig`, which calls `update_config` and stores the config the backend returns.
 
-The Zustand store is a **cache of what the backend last emitted**, not a source of truth in its own right — the backend file remains authoritative.
+The Zustand store is a **cache of what the backend last returned**, not a source of truth: `config.toml` remains authoritative.
 
 ---
 
 ## 6. Current Status & Open Questions
 
-- Only `theme` exists as a config field today; the update model (Section 3) is designed to absorb additional fields (e.g. language) without changing its shape.
-- No concurrency guard exists yet on `update` (see Section 3) — acceptable for current single-writer usage, revisit if that assumption changes.
-- The vault access layer (Section 4) is a separate, not-yet-fully-documented boundary — see the corresponding backlog issue for its own architecture notes once implemented.
+- Fields: `theme` (`light | dark | system`, an enum on both sides) and `username` (validated in Rust by `validate_username`, same rule as `preferencesSchema`).
+- No concurrency guard exists yet on `update` (see Section 3): acceptable for current single-writer usage, revisit if that assumption changes.
+- `check_vault` only proves the vault can be read; a write probe is in the backlog.
