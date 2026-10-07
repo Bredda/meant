@@ -190,6 +190,48 @@ mod tests {
         }
     }
 
+    fn stored(role: &str, content: &str) -> StoredThreadMessage {
+        StoredThreadMessage {
+            role: role.into(),
+            ..stored_result(content)
+        }
+    }
+
+    #[test]
+    fn text_rows_load_as_user_and_assistant_messages() {
+        assert!(matches!(
+            ThreadMessage::try_from(stored("user", "hi")).unwrap(),
+            ThreadMessage::User { content, .. } if content == "hi"
+        ));
+        assert!(matches!(
+            ThreadMessage::try_from(stored("assistant", "hello")).unwrap(),
+            ThreadMessage::Assistant { content, .. } if content == "hello"
+        ));
+    }
+
+    #[test]
+    fn tool_call_rows_parse_their_json_arguments() {
+        let message = ThreadMessage::try_from(stored("tool_call", r#"{"text":"hi"}"#)).unwrap();
+
+        assert!(matches!(
+            message,
+            ThreadMessage::ToolCall { arguments, tool_call_id, .. }
+                if arguments == serde_json::json!({ "text": "hi" }) && tool_call_id == "c1"
+        ));
+    }
+
+    #[test]
+    fn malformed_rows_are_errors_not_panics() {
+        let without_call_id = StoredThreadMessage {
+            tool_call_id: None,
+            ..stored("tool_call", "{}")
+        };
+
+        assert!(ThreadMessage::try_from(without_call_id).is_err());
+        assert!(ThreadMessage::try_from(stored("tool_call", "not json")).is_err());
+        assert!(ThreadMessage::try_from(stored("system", "x")).is_err());
+    }
+
     fn content_of(message: ThreadMessage) -> String {
         match message {
             ThreadMessage::ToolResult { content, .. } => content,
