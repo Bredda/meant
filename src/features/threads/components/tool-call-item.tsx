@@ -33,7 +33,7 @@ export function ToolCallItem({
         )}
 
         <span className="font-mono text-muted-foreground text-xs">
-          {call.tool_name}
+          {call.toolName}
         </span>
 
         <span className="ml-auto text-muted-foreground text-xs">

@@ -6,7 +6,7 @@ import type { RenderItem } from "./types";
  * ready to be displayed
  *
  *  - one "message" item for every user/assistant
- *  - one "tool" item grouping ThreadToolCall and ThreadToolResult (if it exists) via tool_call_id
+ *  - one "tool" item grouping ThreadToolCall and ThreadToolResult (if it exists) via toolCallId
  *
  * Works the same for live or persisted message historic
  * @param messages
@@ -25,13 +25,13 @@ export function groupMessages(messages: ThreadMessage[]): RenderItem[] {
       }
 
       case "tool_call": {
-        toolItemIndexByCallId.set(message.tool_call_id, items.length);
-        items.push({ kind: "tool", key: message.tool_call_id, call: message });
+        toolItemIndexByCallId.set(message.toolCallId, items.length);
+        items.push({ kind: "tool", key: message.toolCallId, call: message });
         break;
       }
 
       case "tool_result": {
-        const index = toolItemIndexByCallId.get(message.tool_call_id);
+        const index = toolItemIndexByCallId.get(message.toolCallId);
         const existing = index === undefined ? undefined : items[index];
 
         if (existing?.kind === "tool" && index !== undefined) {

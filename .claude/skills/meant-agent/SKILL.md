@@ -32,7 +32,7 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
 
 ## Changing an event or message shape
 
-Rust `AgentEvent` / `StoredThreadMessage` (serde: `tag = "type", content = "data"`) and `src/lib/types.ts` must change together, plus every `case` in `thread-context.tsx`. Field casing on the wire is currently mixed (camelCase `Thread`, snake_case events and messages); do not add a third convention — follow the decision in `fixes.md`.
+Rust `AgentEvent` / `StoredThreadMessage` (serde: `tag = "type", content = "data"`) and `src/lib/types.ts` must change together, plus every `case` in `thread-context.tsx`. Everything on the wire is camelCase (`rename_all` on structs, `rename_all_fields` on `AgentEvent`); `ipc_payloads_are_camel_case` in `types.rs` pins it.
 
 ## Providers (`ai/provider.rs`)
 

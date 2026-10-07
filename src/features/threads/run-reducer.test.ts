@@ -6,7 +6,7 @@ const message = (
   id: string,
   role: "user" | "assistant",
   content = ""
-): ThreadMessage => ({ id, role, content, position: 0, thread_id: "t1" });
+): ThreadMessage => ({ id, role, content, position: 0, threadId: "t1" });
 
 describe("runReducer", () => {
   it("appends streamed text to the open assistant segment only", () => {

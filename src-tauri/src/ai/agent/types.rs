@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type", content = "data", rename_all_fields = "camelCase")]
 pub enum AgentEvent {
     ThreadCreated {
         thread: Thread,
@@ -194,6 +194,31 @@ mod tests {
             ThreadMessage::ToolResult { content, .. } => content,
             other => panic!("expected a tool result, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn ipc_payloads_are_camel_case() {
+        let event = AgentEvent::ToolCallCompleted {
+            thread_id: "t1".into(),
+            run_id: "r1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "echo".into(),
+            content: "hi".into(),
+            is_error: false,
+        };
+        let message = serde_json::to_value(stored_result("hi")).unwrap();
+
+        assert_eq!(
+            serde_json::to_value(event).unwrap(),
+            serde_json::json!({
+                "type": "ToolCallCompleted",
+                "data": {
+                    "threadId": "t1", "runId": "r1", "toolCallId": "c1",
+                    "toolName": "echo", "content": "hi", "isError": false
+                }
+            })
+        );
+        assert!(message.get("threadId").is_some() && message.get("toolCallId").is_some());
     }
 
     #[test]

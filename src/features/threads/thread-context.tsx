@@ -136,7 +136,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           role: "assistant",
           content: `⚠️ ${message}`,
           position: livePositionRef.current++,
-          thread_id: runThreadId ?? "",
+          threadId: runThreadId ?? "",
         },
       });
 
@@ -209,7 +209,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           role: "user",
           content,
           position: livePositionRef.current++,
-          thread_id: runThreadId ?? "",
+          threadId: runThreadId ?? "",
         },
       });
 
@@ -254,18 +254,18 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "MessageStarted": {
-            const { message_id } = event.data;
+            const { messageId } = event.data;
 
-            currentAssistantMessageIdRef.current = message_id;
+            currentAssistantMessageIdRef.current = messageId;
 
             dispatch({
               type: "append",
               message: {
-                id: message_id,
+                id: messageId,
                 role: "assistant",
                 content: "",
                 position: livePositionRef.current++,
-                thread_id: runThreadId ?? "",
+                threadId: runThreadId ?? "",
               },
             });
 
@@ -290,18 +290,18 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "ToolCallStarted": {
-            const { tool_call_id, tool_name, arguments: args } = event.data;
+            const { toolCallId, toolName, arguments: args } = event.data;
 
             dispatch({
               type: "append",
               message: {
-                id: tool_call_id,
+                id: toolCallId,
                 role: "tool_call",
-                tool_call_id,
-                tool_name,
+                toolCallId,
+                toolName,
                 content: args,
                 position: livePositionRef.current++,
-                thread_id: runThreadId ?? "",
+                threadId: runThreadId ?? "",
               },
             });
 
@@ -309,22 +309,18 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "ToolCallCompleted": {
-            const {
-              tool_call_id,
-              tool_name,
-              content: toolContent,
-            } = event.data;
+            const { toolCallId, toolName, content: toolContent } = event.data;
 
             dispatch({
               type: "append",
               message: {
-                id: `${tool_call_id}:result`,
+                id: `${toolCallId}:result`,
                 role: "tool_result",
-                tool_call_id,
-                tool_name,
+                toolCallId,
+                toolName,
                 content: toolContent,
                 position: livePositionRef.current++,
-                thread_id: runThreadId ?? "",
+                threadId: runThreadId ?? "",
               },
             });
 

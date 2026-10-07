@@ -19,7 +19,7 @@ export type RenderToolItem = {
 /**
  * Regroups flats messages into items ready to be displayed
  *  - one "message" item for every user/assistant
- *  - one "tool" item grouping ThreadToolCall and ThreadToolResult (if it exists) via tool_call_id
+ *  - one "tool" item grouping ThreadToolCall and ThreadToolResult (if it exists) via toolCallId
  *
  * Works the same for live or persisted message historic
  */

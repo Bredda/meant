@@ -10,6 +10,7 @@ pub struct Thread {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StoredThreadMessage {
     pub id: String,
     pub position: i64,

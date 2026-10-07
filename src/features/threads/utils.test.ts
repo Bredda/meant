@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ThreadMessage } from "@/lib/types";
 import { groupMessages } from "./utils";
 
-const base = { position: 0, thread_id: "t1" };
+const base = { position: 0, threadId: "t1" };
 
 const user = (id: string): ThreadMessage => ({
   ...base,
@@ -20,16 +20,16 @@ const call = (callId: string): ThreadMessage => ({
   ...base,
   id: `row-${callId}`,
   role: "tool_call",
-  tool_call_id: callId,
-  tool_name: "echo",
+  toolCallId: callId,
+  toolName: "echo",
   content: "{}",
 });
 const result = (callId: string): ThreadMessage => ({
   ...base,
   id: `row-${callId}-result`,
   role: "tool_result",
-  tool_call_id: callId,
-  tool_name: "echo",
+  toolCallId: callId,
+  toolName: "echo",
   content: '"ok"',
 });
 
