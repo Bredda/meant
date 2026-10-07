@@ -1,7 +1,9 @@
 import { cn } from "@/lib/utils"
 import { RiLoaderLine } from "@remixicon/react";
 
-function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+// Local fix: shadcn types these props as ComponentProps<"svg">, which allows
+// `children` that Remixicon forbids and breaks `tsc`.
+function Spinner({ className, ...props }: React.ComponentProps<typeof RiLoaderLine>) {
   return (
     <RiLoaderLine
       role="status"
