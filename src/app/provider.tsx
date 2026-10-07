@@ -6,7 +6,7 @@ import AppErrorPage from "@/features/errors/app-error";
 
 export default function AppProvider({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider storageKey="vite-ui-theme">
+    <ThemeProvider>
       <Suspense fallback={<>Loading...</>}>
         <ErrorBoundary FallbackComponent={AppErrorPage}>
           <TooltipProvider>{children}</TooltipProvider>

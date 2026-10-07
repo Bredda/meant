@@ -37,6 +37,9 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const [thread, setThread] = useState<Thread | null>(null);
 
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  // Read by sendMessage, so it is not recreated on every streamed flush.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const [isBusy, setIsBusy] = useState(false);
 
@@ -194,8 +197,8 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
        * Snapshot taken BEFORE any optimistic update:
        * this is the basis on which we build final state when RunCompleted
        */
-      preRunMessagesRef.current = messages;
-      livePositionRef.current = messages.length;
+      preRunMessagesRef.current = messagesRef.current;
+      livePositionRef.current = messagesRef.current.length;
       currentAssistantMessageIdRef.current = null;
 
       // The thread this run belongs to, whatever the user opens meanwhile.
@@ -219,8 +222,6 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       const channel = new Channel<AgentEvent>();
 
       channel.onmessage = (event) => {
-        console.debug("Received Thread event", event);
-
         const displayed = isRunDisplayed(runThreadId, threadIdRef.current);
 
         if (event.type === "ThreadCreated") {
@@ -383,7 +384,6 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       endRun,
       handleError,
       handleHiddenRunEvent,
-      messages,
       revalidate,
       textBuffer,
     ]
