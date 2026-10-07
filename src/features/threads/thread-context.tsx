@@ -10,6 +10,7 @@ import {
 import { useTextBuffer } from "@/hooks/use-text-buffer";
 import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
 import { isRunDisplayed, type RunAction, runReducer } from "./run-reducer";
+import { getThread } from "./thread-loader";
 
 type SendMessageOptions = {
   onThreadCreated?: (thread: Thread) => void;
@@ -102,23 +103,44 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleError = useCallback(
-    (message: string) => {
+    (message: string, runThreadId: string | null) => {
       textBuffer.stop(true);
+
+      const fallbackId = crypto.randomUUID();
+      const warningId = currentAssistantMessageIdRef.current ?? fallbackId;
 
       dispatch({
         type: "fail",
         messageId: currentAssistantMessageIdRef.current,
         warning: message,
         fallback: {
-          id: crypto.randomUUID(),
+          id: fallbackId,
           role: "assistant",
           content: `⚠️ ${message}`,
           position: livePositionRef.current++,
-          thread_id: threadIdRef.current ?? "",
+          thread_id: runThreadId ?? "",
         },
       });
 
       endRun();
+
+      if (!runThreadId) {
+        return;
+      }
+      getThread(runThreadId)
+        .then(({ messages: persisted }) => {
+          // Skip if the user moved on or already started another run.
+          if (
+            activeRunRef.current ||
+            !isRunDisplayed(runThreadId, threadIdRef.current)
+          ) {
+            return;
+          }
+          dispatch({ type: "reloadAfterFailure", persisted, warningId });
+        })
+        .catch((error: unknown) => {
+          console.error("Could not reload thread after a failed run", error);
+        });
     },
     [dispatch, endRun, textBuffer]
   );
@@ -298,7 +320,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           }
 
           case "Error": {
-            handleError(event.data.message);
+            handleError(event.data.message, runThreadId);
             break;
           }
 
@@ -326,7 +348,10 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           endRun();
           return;
         }
-        handleError(error instanceof Error ? error.message : String(error));
+        handleError(
+          error instanceof Error ? error.message : String(error),
+          runThreadId
+        );
       }
     },
     [dispatch, endRun, handleError, messages, textBuffer]

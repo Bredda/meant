@@ -78,3 +78,21 @@ describe("isRunDisplayed", () => {
     expect(isRunDisplayed(null, null)).toBe(true);
   });
 });
+
+describe("runReducer after a failed run", () => {
+  it("shows the persisted rows followed by the warning", () => {
+    const live = [
+      message("tmp-user", "user", "hi"),
+      message("w1", "assistant", "⚠️ boom"),
+    ];
+    const persisted = [message("u-db", "user", "hi")];
+
+    const next = runReducer(live, {
+      type: "reloadAfterFailure",
+      persisted,
+      warningId: "w1",
+    });
+
+    expect(next.map((m) => m.id)).toEqual(["u-db", "w1"]);
+  });
+});

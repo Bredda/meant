@@ -15,7 +15,13 @@ export type RunAction =
       /** Shown when there is no open segment (e.g. failure during a tool call). */
       fallback: ThreadMessage;
     }
-  | { type: "complete"; snapshot: ThreadMessage[]; persisted: ThreadMessage[] };
+  | { type: "complete"; snapshot: ThreadMessage[]; persisted: ThreadMessage[] }
+  | {
+      type: "reloadAfterFailure";
+      persisted: ThreadMessage[];
+      /** The message carrying the failure warning, kept after the rows. */
+      warningId: string;
+    };
 
 export function runReducer(
   messages: ThreadMessage[],
@@ -56,6 +62,16 @@ export function runReducer(
     // rather than reconciled message by message (see reference/agents.md).
     case "complete":
       return [...action.snapshot, ...action.persisted];
+
+    // A failed run persists only the user message: show the rows as they
+    // really are (so the next run's snapshot matches the database), plus the
+    // warning, which exists only in the UI until runs are persisted.
+    case "reloadAfterFailure": {
+      const warning = messages.find(
+        (message) => message.id === action.warningId
+      );
+      return warning ? [...action.persisted, warning] : action.persisted;
+    }
 
     default:
       return messages;
