@@ -115,3 +115,34 @@ export function isAwaitingFirstToken(
   const [last] = messages.slice(-1);
   return isBusy && last?.role === "user";
 }
+
+/**
+ * Which assistant message gets special treatment while the list is shown:
+ * the last one keeps its footer actions visible, and the one being written
+ * (last item of the list while a run is on) holds back avatar and footer
+ * until it is finished, so they do not travel down with the text.
+ */
+export function assistantDisplay(
+  items: RenderItem[],
+  isBusy: boolean
+): { lastKey: string | null; streamingKey: string | null } {
+  const isAssistant = (item: RenderItem | undefined) =>
+    item?.kind === "message" && item.message.role === "assistant";
+
+  let lastKey: string | null = null;
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index];
+    if (item && isAssistant(item)) {
+      lastKey = item.key;
+      break;
+    }
+  }
+
+  const [lastItem] = items.slice(-1);
+
+  return {
+    lastKey,
+    streamingKey:
+      lastItem && isBusy && isAssistant(lastItem) ? lastItem.key : null,
+  };
+}

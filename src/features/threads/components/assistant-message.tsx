@@ -14,13 +14,29 @@ import { cn } from "@/lib/utils";
 
 export function AssistantMessage({
   message,
+  isLast,
+  isStreaming,
 }: {
   message: ThreadAssistantMessage;
+  /** The thread's last assistant message: its actions stay visible. */
+  isLast: boolean;
+  /** Still being written: avatar and actions wait for the end of the text. */
+  isStreaming: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   return (
     <Message align="start" className="group/message">
-      <MessageAvatar>
+      {/*
+       * Kept in the layout while hidden: the avatar sits at the bottom of the
+       * message and would travel down with the text as it grows.
+       */}
+      <MessageAvatar
+        aria-hidden={isStreaming}
+        className={cn(
+          "transition-opacity duration-150",
+          isStreaming && "opacity-0"
+        )}
+      >
         <Avatar>
           <AvatarFallback>
             <BotIcon className="size-4" />
@@ -33,7 +49,11 @@ export function AssistantMessage({
         </div>
         <MessageFooter
           className={cn(
-            "gap-2 opacity-0 transition-opacity duration-150 group-focus-within/message:opacity-100 group-hover/message:opacity-100",
+            "gap-2 transition-opacity duration-150",
+            isLast
+              ? // Always there, but not clickable before the text is complete.
+                (isStreaming && "invisible") || "opacity-100"
+              : "opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100",
             copied && "opacity-100"
           )}
         >

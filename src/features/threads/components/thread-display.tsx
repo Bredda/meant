@@ -10,14 +10,26 @@ import {
 } from "@/components/ui/message-scroller";
 import type { RunSummary, ThreadMessage } from "@/lib/types";
 import type { RenderItem } from "../types";
-import { groupMessages, isAwaitingFirstToken } from "../utils";
+import {
+  assistantDisplay,
+  groupMessages,
+  isAwaitingFirstToken,
+} from "../utils";
 import { AssistantMessage } from "./assistant-message";
 import { RegenerateButton } from "./regenerate-button";
 import { RunNotice } from "./run-notice";
 import { ToolMessage } from "./tool-message";
 import { UserMessage } from "./user-message";
 
-function ItemContent({ item }: { item: RenderItem }) {
+function ItemContent({
+  item,
+  isLastAssistant,
+  isStreaming,
+}: {
+  item: RenderItem;
+  isLastAssistant: boolean;
+  isStreaming: boolean;
+}) {
   if (item.kind === "tool") {
     return <ToolMessage item={item} />;
   }
@@ -27,7 +39,13 @@ function ItemContent({ item }: { item: RenderItem }) {
   if (item.message.role === "user") {
     return <UserMessage message={item.message} />;
   }
-  return <AssistantMessage message={item.message} />;
+  return (
+    <AssistantMessage
+      isLast={isLastAssistant}
+      isStreaming={isStreaming}
+      message={item.message}
+    />
+  );
 }
 
 export function ThreadDisplay({
@@ -45,6 +63,7 @@ export function ThreadDisplay({
   const items = useMemo(() => groupMessages(messages, runs), [messages, runs]);
   // The question is sent, no answer has started: the model is still working.
   const awaitingFirstToken = isAwaitingFirstToken(messages, isBusy);
+  const { lastKey, streamingKey } = assistantDisplay(items, isBusy);
 
   /*
    * Lives inside the last item, never as a child of its own: the scroller
@@ -77,7 +96,11 @@ export function ThreadDisplay({
                   item.kind === "message" && item.message.role === "user"
                 }
               >
-                <ItemContent item={item} />
+                <ItemContent
+                  isLastAssistant={item.key === lastKey}
+                  isStreaming={item.key === streamingKey}
+                  item={item}
+                />
                 {index === items.length - 1 && tail}
               </MessageScrollerItem>
             ))}

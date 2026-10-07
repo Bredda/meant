@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { RunSummary, Thread, ThreadMessage } from "@/lib/types";
-import { filterThreads, groupMessages, isAwaitingFirstToken } from "./utils";
+import {
+  assistantDisplay,
+  filterThreads,
+  groupMessages,
+  isAwaitingFirstToken,
+} from "./utils";
 
 const base = { position: 0, threadId: "t1" };
 
@@ -192,5 +197,45 @@ describe("isAwaitingFirstToken", () => {
   it("is false when no run is on or nothing is displayed", () => {
     expect(isAwaitingFirstToken([user("u1")], false)).toBe(false);
     expect(isAwaitingFirstToken([], true)).toBe(false);
+  });
+});
+
+describe("assistantDisplay", () => {
+  const itemsOf = (...messages: ThreadMessage[]) => groupMessages(messages);
+
+  it("marks the last assistant message, whatever follows it", () => {
+    const items = itemsOf(
+      user("u1"),
+      assistant("a1"),
+      call("c1"),
+      result("c1")
+    );
+
+    expect(assistantDisplay(items, false)).toEqual({
+      lastKey: "a1",
+      streamingKey: null,
+    });
+  });
+
+  it("holds back only the message being written", () => {
+    const items = itemsOf(user("u1"), assistant("a1"));
+
+    expect(assistantDisplay(items, true)).toEqual({
+      lastKey: "a1",
+      streamingKey: "a1",
+    });
+  });
+
+  it("releases a segment once a tool call follows it", () => {
+    const items = itemsOf(user("u1"), assistant("a1"), call("c1"));
+
+    expect(assistantDisplay(items, true).streamingKey).toBeNull();
+  });
+
+  it("has nothing to mark without an assistant message", () => {
+    expect(assistantDisplay(itemsOf(user("u1")), true)).toEqual({
+      lastKey: null,
+      streamingKey: null,
+    });
   });
 });
