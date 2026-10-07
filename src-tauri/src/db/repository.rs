@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::db::models::StoredThreadMessage;
+use crate::db::{migrations, models::StoredThreadMessage};
 
 use super::models::Thread;
 
@@ -13,41 +13,17 @@ pub struct ThreadRepository {
 
 impl ThreadRepository {
     pub fn new(path: &Path) -> Result<Self, String> {
-        let database_path = path.join("meant.db");
-        let connection = Connection::open(database_path).map_err(|e| e.to_string())?;
+        let connection = Connection::open(path.join("meant.db")).map_err(|e| e.to_string())?;
+        Self::from_connection(connection)
+    }
 
+    /// Prepares any connection (a file, or an in-memory database in tests).
+    pub fn from_connection(mut connection: Connection) -> Result<Self, String> {
+        // Per-connection setting, not part of the schema.
         connection
-            .execute_batch(
-                r#"
-                PRAGMA foreign_keys = ON;
-
-                CREATE TABLE IF NOT EXISTS threads (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS messages (
-                    id TEXT PRIMARY KEY,
-                    thread_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    tool_call_id TEXT,
-                    tool_name TEXT,
-                    position INTEGER NOT NULL,
-                    created_at INTEGER NOT NULL,
-
-                    FOREIGN KEY (thread_id)
-                        REFERENCES threads(id)
-                        ON DELETE CASCADE
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_messages_thread
-                    ON messages(thread_id, position);
-                "#,
-            )
+            .pragma_update(None, "foreign_keys", true)
             .map_err(|e| e.to_string())?;
+        migrations::migrate(&mut connection).map_err(|e| e.to_string())?;
 
         Ok(Self {
             connection: Mutex::new(connection),

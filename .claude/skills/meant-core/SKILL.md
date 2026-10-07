@@ -30,7 +30,8 @@ Read `reference/ARCHITECTURE.md` and `reference/config.md` for the why. This ski
 ## SQLite (`db/`)
 
 - One connection behind a `Mutex`; every method locks, runs, returns owned values.
-- Schema is created with `CREATE TABLE IF NOT EXISTS` in `ThreadRepository::new`. There is no migration mechanism yet: **do not change an existing table** before `fixes.md` adds `PRAGMA user_version` migrations.
+- Schema changes are migrations: add `src-tauri/src/db/migrations/NNNN_name.sql` and append it to `MIGRATIONS` in `db/migrations.rs` (`PRAGMA user_version` = migrations applied, each run in a transaction). Never edit or reorder an applied migration. Add a test in `migrations.rs` for any data transformation.
+- Repository tests use `ThreadRepository::from_connection(Connection::open_in_memory()?)`.
 - Message `role` is one of `user | assistant | tool_call | tool_result`; tool payloads are JSON strings in `content`. Converting rows to agent messages goes through `TryFrom<StoredThreadMessage> for ThreadMessage` (`ai/agent/types.rs`).
 - Timestamps are Unix seconds (`chrono::Utc::now().timestamp()`); the UI multiplies by 1000.
 
