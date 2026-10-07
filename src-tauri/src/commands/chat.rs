@@ -19,12 +19,15 @@ use crate::{
 pub struct ChatRequest {
     pub thread_id: Option<String>,
     pub input: String,
+    /// Id the UI already shows the message under, kept so the persisted row
+    /// replaces it without the UI seeing a new message. Generated when absent.
+    pub user_message_id: Option<String>,
 }
 
 /// What a run answers.
 pub enum RunTarget {
     /// A new user message, stored before the model is called.
-    Send { input: String },
+    Send { input: String, message_id: String },
     /// The thread's last user message again: the previous answer is replaced
     /// once the new one exists.
     Regenerate,
@@ -38,6 +41,8 @@ pub async fn chat(
     channel: Channel<AgentEvent>,
 ) -> Result<(), AppError> {
     let run_id = uuid::Uuid::new_v4().to_string();
+    // Checked first: a bad id must not leave a freshly created thread behind.
+    let message_id = message_id_or_new(request.user_message_id)?;
 
     // Retrieves or creates thread based on optional request thread_id
     let thread = match request.thread_id {
@@ -68,6 +73,7 @@ pub async fn chat(
         &run_id,
         RunTarget::Send {
             input: request.input,
+            message_id,
         },
     )
     .await
@@ -152,14 +158,14 @@ async fn execute_run(
     cancel: CancelSignal,
 ) -> Result<RunStatus, AppError> {
     let (history, persist) = match target {
-        RunTarget::Send { input } => {
+        RunTarget::Send { input, message_id } => {
             // Persisted before the model runs: the user's input survives a
             // failed run.
             let user_message = state.threads.add_message(
                 thread_id,
                 Some(run_id),
                 &NewMessage {
-                    id: uuid::Uuid::new_v4().to_string(),
+                    id: message_id,
                     role: "user",
                     content: input,
                     tool_call_id: None,
@@ -261,6 +267,17 @@ async fn execute_run(
 /// Index of the user message a regenerated run answers: the last one.
 pub fn regeneration_point(messages: &[StoredThreadMessage]) -> Option<usize> {
     messages.iter().rposition(|message| message.role == "user")
+}
+
+/// The id a new user message is stored under: the UI's own when it sent one
+/// (it must be a UUID, like every id the database holds), else a fresh one.
+fn message_id_or_new(requested: Option<String>) -> Result<String, AppError> {
+    match requested {
+        None => Ok(uuid::Uuid::new_v4().to_string()),
+        Some(id) => uuid::Uuid::parse_str(&id)
+            .map(|id| id.to_string())
+            .map_err(|_| AppError::InvalidInput("The message id is not a valid UUID".into())),
+    }
 }
 
 const PROVISIONAL_TITLE_CHARS: usize = 50;
@@ -400,5 +417,30 @@ mod regeneration_tests {
     fn a_thread_without_a_user_message_has_nothing_to_regenerate() {
         assert_eq!(regeneration_point(&[]), None);
         assert_eq!(regeneration_point(&[row("a1", "assistant", 0)]), None);
+    }
+}
+
+#[cfg(test)]
+mod message_id_tests {
+    use super::*;
+
+    #[test]
+    fn the_ids_of_the_ui_are_kept() {
+        let id = "0b0d6f0e-5a1a-4f0a-9c55-1f2c3d4e5f60";
+
+        assert_eq!(message_id_or_new(Some(id.into())).unwrap(), id);
+    }
+
+    #[test]
+    fn a_missing_id_is_generated() {
+        let id = message_id_or_new(None).unwrap();
+
+        assert!(uuid::Uuid::parse_str(&id).is_ok());
+    }
+
+    #[test]
+    fn anything_else_is_rejected() {
+        assert!(message_id_or_new(Some("../../x".into())).is_err());
+        assert!(message_id_or_new(Some(String::new())).is_err());
     }
 }

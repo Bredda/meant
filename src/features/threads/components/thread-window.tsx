@@ -48,6 +48,7 @@ export function ThreadWindow({
         <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
           <ThreadDisplay
             isBusy={isBusy}
+            key={thread.id}
             messages={messages}
             onRegenerate={onRegenerate}
             runs={runs}

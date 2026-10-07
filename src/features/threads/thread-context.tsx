@@ -273,6 +273,9 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       let runThreadId = threadIdRef.current;
       // Known from the first event; tells the reload which run row to expect.
       let runId: string | null = null;
+      // The message the user sees keeps its id once stored (Rust reuses it),
+      // so the scroller does not take the stored row for a new message.
+      const userMessageId = crypto.randomUUID();
 
       if (content === undefined) {
         // Regenerating: the answer being replaced leaves the screen now.
@@ -282,7 +285,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         dispatch({
           type: "append",
           message: {
-            id: crypto.randomUUID(),
+            id: userMessageId,
             role: "user",
             content,
             position: livePositionRef.current++,
@@ -446,7 +449,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
       try {
         await invoke(command, {
-          request: { threadId: runThreadId, input: content },
+          request: { threadId: runThreadId, input: content, userMessageId },
           channel,
         });
         // Sidebar order, thread title and run notices, now the run is closed.
