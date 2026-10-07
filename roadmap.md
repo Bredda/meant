@@ -26,7 +26,7 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 
 | # | Axe | Horizon | Statut |
 | --- | --- | --- | --- |
-| 1 | Socle du projet | En cours | Corrections de `fixes.md` appliquées (branche `fix/review-fixes`), vérifications et CI en place ; reste la vérification manuelle dans l’app (`todo.md`) |
+| 1 | Socle du projet | Fait | Instructions agents, skills, hooks, revue appliquée, tests (Vitest, cargo), pre-push et CI ; premier passage de la CI à constater sur GitHub |
 | 2 | Configuration et secrets | Fait | Assistant de premier lancement, préférences dans `config.toml`, clés Anthropic et OpenAI dans le vault, réglages. Fusionné, B5, R5 et S4 appliqués |
 | 3 | Conversations robustes | Ensuite | Streaming, persistance et appels d'outils fonctionnent ; manquent titres, gestion des fils, annulation, runs persistés |
 | 4 | Fournisseurs et modèles | Ensuite | Deux fournisseurs, modèle codé en dur, premier fournisseur configuré utilisé |
@@ -43,7 +43,7 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 
 Fait : `AGENTS.md` (et `CLAUDE.md`), skills `meant-core`, `meant-agent` et `meant-ui`, hook de formatage automatique, suivi du travail à quatre fichiers (`roadmap.md`, `todo.md`, `backlog.md`, `fixes.md`). Revue complète du code existant dans `fixes.md`.
 
-Fait aussi : les 31 corrections de `fixes.md` (build, envoi de message, fins de ligne, bugs du streaming, CSP, migrations SQLite, table `runs`, erreurs typées, camelCase sur l'IPC, Vitest, CI). Reste : la vérification manuelle dans l'application listée dans `todo.md`, et un premier passage de la CI.
+Fait aussi : les 31 corrections de la revue (build, envoi de message, fins de ligne, bugs du streaming, CSP, migrations SQLite, table `runs`, erreurs typées, camelCase sur l’IPC, Vitest, CI), vérifiées dans l’application. Reste à constater le premier passage de la CI sur GitHub.
 
 **Terminé quand :** `pnpm typecheck`, `pnpm check`, `pnpm test`, `cargo clippy -- -D warnings` et `cargo test` passent en local et en CI, et `fixes.md` ne contient plus d'entrée en attente.
 
