@@ -44,7 +44,7 @@ where
             })?;
         }
 
-        let encoded = C::encode(value)?;
+        let encoded = C::encode(value, &self.path)?;
 
         // Atomic write: write to a temp file, then rename.
         // If the app crashes mid-write, the real config file is untouched —
@@ -79,10 +79,6 @@ where
         Ok(value)
     }
 }
-
-/**
- * UNIT TESTS
- */
 
 #[cfg(test)]
 mod tests {

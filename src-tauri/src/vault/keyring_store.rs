@@ -41,16 +41,3 @@ impl SecretStore for KeyringStore {
         }
     }
 }
-
-/**
- * TESTS
- */
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::sync::Mutex;
-
-    use crate::vault::error::VaultError;
-    use crate::vault::SecretStore;
-}

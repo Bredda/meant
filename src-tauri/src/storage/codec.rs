@@ -1,18 +1,18 @@
 use crate::storage::error::StoreError;
 use serde::{de::DeserializeOwned, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub trait Codec {
-    fn encode<T: Serialize>(value: &T) -> Result<String, StoreError>;
+    fn encode<T: Serialize>(value: &T, path: &Path) -> Result<String, StoreError>;
     fn decode<T: DeserializeOwned>(raw: &str, path: &Path) -> Result<T, StoreError>;
 }
 
 pub struct TomlCodec;
 
 impl Codec for TomlCodec {
-    fn encode<T: Serialize>(value: &T) -> Result<String, StoreError> {
+    fn encode<T: Serialize>(value: &T, path: &Path) -> Result<String, StoreError> {
         toml::to_string_pretty(value).map_err(|source| StoreError::Encode {
-            path: PathBuf::new(), // voir note plus bas
+            path: path.to_path_buf(),
             source,
         })
     }

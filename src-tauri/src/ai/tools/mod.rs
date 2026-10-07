@@ -1,7 +1,7 @@
 pub mod echo;
 
-use serde_json::Value;
-
+// Not constructed yet: `echo` cannot fail. Real tools (roadmap axis 5) will use both.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ToolError {
     InvalidInput(String),

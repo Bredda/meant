@@ -5,6 +5,8 @@ use crate::ai::agent::{
 
 use serde::Serialize;
 
+// Only `Running` is used until runs are persisted (fixes.md R4).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RunStatus {
@@ -50,10 +52,7 @@ where
                     thread_id: Some(run.thread_id.clone()),
                     message: error.to_string(),
                 });
-                return Err(AgentError::Runtime(format!(
-                    "Unexpected error: {}!",
-                    error.to_string()
-                )));
+                Err(AgentError::Runtime(format!("Unexpected error: {error}!")))
             }
         }
     }

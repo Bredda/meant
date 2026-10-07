@@ -60,14 +60,10 @@ pub enum AgentEvent {
 }
 
 #[derive(Debug, Clone)]
-pub enum ChatRole {
-    User,
-    Assistant,
-}
-
-#[derive(Debug, Clone)]
 pub enum ThreadMessage {
     User {
+        // Not read when replaying history, kept so every variant carries its row id.
+        #[allow(dead_code)]
         id: String,
         content: String,
     },
@@ -90,16 +86,6 @@ pub enum ThreadMessage {
         tool_name: String,
         content: serde_json::Value,
     },
-}
-
-impl ThreadMessage {
-    pub fn content(&self) -> &str {
-        match self {
-            Self::User { content, .. } | Self::Assistant { content, .. } => content,
-
-            Self::ToolCall { .. } | Self::ToolResult { .. } => "",
-        }
-    }
 }
 
 impl TryFrom<StoredThreadMessage> for ThreadMessage {
