@@ -107,7 +107,7 @@ mod tests {
         let store: AtomicFileStore<AppConfig, TomlCodec> =
             AtomicFileStore::new(dir.path().join("config.toml"));
 
-        let config = AppConfig { theme: "dark".to_string() };
+        let config = AppConfig { theme: "dark".to_string(), username: "toto".to_string() };
         store.save(&config).unwrap();
 
         let loaded = store.load().unwrap();

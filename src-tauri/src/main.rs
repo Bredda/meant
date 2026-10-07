@@ -16,12 +16,8 @@ use db::ThreadRepository;
 use state::AppState;
 
 use crate::{
-    ai::agent::react::ReActAgent, 
-    config::config_store, 
-    runs::service::RunService, 
-    vault::{
-        error::VaultError, 
-        keyring_store::KeyringStore}
+    config::config_store,
+    vault::keyring_store::KeyringStore,
 };
 
 fn main() {
@@ -37,19 +33,13 @@ fn main() {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             let store = config_store(&app_data_dir);
-            let vault  = KeyringStore::new("meant");
-                ThreadRepository::new(&app_data_dir)
-            .   expect("Failed to initialize database");
-            let threads = 
-                ThreadRepository::new(&app_data_dir)
-            .   expect("Failed to initialize database");
-            let agent = ReActAgent::new().expect("Failed to initialize AI agent");
-            app.manage(AppState {
-                agent: RunService::new(agent),
-                threads,
-                vault,
-                config_store: store,
-            });
+            let vault = KeyringStore::new("meant");
+            let threads =
+                ThreadRepository::new(&app_data_dir).expect("Failed to initialize database");
+
+            // The agent is not built here: on a fresh install no API key exists
+            // yet. AppState builds it lazily from the vault on the first run.
+            app.manage(AppState::new(threads, store, vault));
 
             Ok(())
         })
@@ -61,6 +51,9 @@ fn main() {
             commands::update_config::update_config,
             commands::setup::check_vault,
             commands::setup::load_config,
+            commands::secrets::list_secrets,
+            commands::secrets::set_secret,
+            commands::secrets::delete_secret
             ]
         
         )

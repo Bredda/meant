@@ -4,3 +4,4 @@ pub mod list_threads;
 pub mod get_thread_messages;
 pub mod update_config;
 pub mod setup;
+pub mod secrets;

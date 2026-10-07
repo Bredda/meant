@@ -6,6 +6,12 @@ pub enum VaultError {
     #[error("invalid secret data for key: {0}")]
     InvalidData(String),
 
+    #[error("this does not look like a valid {0} API key")]
+    InvalidFormat(String),
+
+    #[error("at least one AI provider must stay configured")]
+    LastProvider,
+
     #[error("unexpected vault error: {0}")]
     Unknown(String),
 }

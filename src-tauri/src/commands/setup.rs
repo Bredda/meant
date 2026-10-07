@@ -1,9 +1,9 @@
 use tauri::State;
-use crate::AppState;
-use crate::VaultError;
 use crate::config::AppConfig;
+use crate::state::AppState;
 use crate::storage::error::StoreError;
 use crate::vault::SecretStore;
+use crate::vault::error::VaultError;
 
 #[tauri::command]
 pub fn check_vault(state: State<'_, AppState>) -> Result<(), VaultError> {

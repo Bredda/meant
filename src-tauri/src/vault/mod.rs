@@ -1,7 +1,8 @@
 pub mod keyring_store;
 pub mod error;
+pub mod secrets;
 #[cfg(test)]
-mod mock;   
+mod mock;
 
 use crate::vault::error::VaultError;
 
