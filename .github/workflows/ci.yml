@@ -1,20 +1,11 @@
 name: CI
 
-# Documentation-only changes cannot break the build: skip the run.
+# No path filter on purpose: `main` requires the "checks" job, and a skipped
+# workflow would leave documentation-only pull requests waiting forever.
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - "reference/**"
-      - "LICENSE"
-      - "assets/**"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - "reference/**"
-      - "LICENSE"
-      - "assets/**"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -25,6 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so commitlint can read the pull request's commits.
+          fetch-depth: 0
 
       - name: System dependencies (Tauri, keyring)
         run: |
@@ -41,6 +35,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      - name: Commit messages (Conventional Commits)
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
       - name: Typecheck
         run: pnpm typecheck
       - name: Lint and format (Biome)
