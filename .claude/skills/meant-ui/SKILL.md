@@ -41,4 +41,4 @@ The streaming state machine lives in `features/threads/thread-context.tsx`: read
 
 ## Checks
 
-`pnpm typecheck` and `pnpm check` (run `pnpm fix` to apply Biome fixes). There is no frontend test runner yet. A UI change is only verified in `pnpm tauri dev`: say what you exercised and what you did not.
+`pnpm typecheck` and `pnpm check` (run `pnpm fix` to apply Biome fixes). Pure logic (reducers, grouping, schemas) gets a colocated Vitest `*.test.ts` (`pnpm test`); keep it out of components so it stays testable. A UI change is only verified in `pnpm tauri dev`: say what you exercised and what you did not.
