@@ -51,7 +51,21 @@ A **run** is one execution of the agent against a thread, triggered by a new use
 6. Everything the run produced (assistant text, tool calls, tool results) is persisted in one transaction.
 7. The UI is given the authoritative, persisted version of what happened, and the run is closed as `completed`, or as `failed` with its error.
 
-This lifecycle is intentionally linear: persistence of the user message happens *before* the model runs, and persistence of everything else happens *after* the run completes, all or nothing. A failed run therefore leaves the user message and a `failed` run row; text streamed before the failure is not stored. On a failure the UI reloads the thread's rows and keeps the error warning after them.
+This lifecycle is intentionally linear: persistence of the user message happens *before* the model runs, and persistence of everything else happens *after* the run completes, all or nothing. A failed run therefore leaves the user message and a `failed` run row; text streamed before the failure is not stored. `get_thread` returns the thread's runs next to its messages, and the UI shows a notice after the last message of every `failed` run (with its error), also after a restart. Right after a failure the UI reloads the thread once `invoke` has settled (the run row is closed after the `Error` event, so reloading on the event would still read `running`); the live warning only stays when the failure happened before the run was recorded (e.g. no key configured).
+
+---
+
+### Regenerating an answer
+
+`regenerate` runs the same pipeline as `chat` (same events, same registry, same run row) but answers the thread's last user message again instead of storing a new one. The model sees the history up to that message; the previous answer (everything after it) stays in the database until the new output replaces it in one transaction (`replace_messages_after`), so a failed run leaves it untouched. The user message is handed over to the new run. A run stopped before it produced anything keeps the previous answer too. `RunCompleted` carries only the new output; the UI shows the messages up to the user message while it streams, and `[...those, ...persisted]` once it ends.
+
+### Thread titles
+
+A thread starts with a provisional title (the beginning of its first message) and `threads.title_source = 'default'`. Once a `completed` run is closed, `ai/title.rs` names the thread in the background when it is still `default` and holds exactly one question and a text answer: one extra call to the same provider and model, no tools, with a bounded excerpt of the exchange. The result is stored with `UPDATE … WHERE title_source = 'default'`, so a title the user typed in the meantime always wins, and Rust emits the `thread-title-updated` app event (not on the run's channel, which is closed by then) that makes the UI refresh its route data. A failure is only logged; the provisional title stays. This is the one place where a conversation's text goes to the provider outside a run.
+
+### Stopping a run
+
+A run is registered (`RunRegistry`, one run per thread) with a cancel signal. The `cancel_run` command fires it; the runtime, which waits on the model's stream, sees it, ends early and returns what it produced with the `Cancelled` outcome. The run then goes through the same persistence step as a completed one and its row is closed as `cancelled`. A thread with a run in progress cannot be deleted.
 
 ---
 
@@ -77,7 +91,7 @@ A single run can contain **multiple assistant text segments**, interleaved with 
 
 Two events act as terminals for the whole run:
 
-- **`RunCompleted`** — the run finished normally. It carries the complete, persisted list of messages produced by the run, which the UI treats as authoritative.
+- **`RunCompleted`** — the run finished normally, or was stopped by the user (`status` is `completed` or `cancelled`). It carries the complete, persisted list of messages produced by the run, which the UI treats as authoritative. A stopped run keeps what it had produced (partial text, finished tool calls); a tool call that had no result yet is dropped, since a history with an unanswered call is invalid for providers.
 - **`Error`** — the run failed. It carries a `kind` (`provider` for a failed completion: rejected key, network, rate limit; `internal` otherwise) and a message. It is emitted once, by `RunService`; the UI ignores the matching `invoke` rejection.
 
 ---
@@ -114,15 +128,16 @@ A tool can fail in two meaningfully different ways:
 - **A recoverable, "business" failure** (a file doesn't exist, a query is invalid) — this is information the model should see and can act on, so it is treated as a normal tool result rather than an error that halts the run.
 - **A fatal failure** (misconfiguration, unrecoverable internal error) — this is allowed to interrupt the run and surface as an `Error` event.
 
-The distinction between the two, and how it's surfaced to the UI (e.g. visually marking a tool call as failed), is an evolving convention layered on top of what the underlying model-provider library exposes — it is not yet fully standardized across all tools.
+A recoverable failure is a tool returning `Err`: Rig turns it into a result whose text is the error message, the model sees it and the run goes on. The result item that reaches the stream carries only that text, so `ReActAgent` attaches a per-run Rig hook (`FailedToolCalls`, `on_tool_result`) that records the calls that did not succeed (failed, refused or skipped) by call id, and reads it when the matching result arrives. That flag travels as `isError` on `ToolCallCompleted`, is stored on the `tool_result` row (`messages.is_error`) and marks the call as failed in the UI, live and after a restart. The model only ever replays the text.
 
 ---
 
 ## 6. Current Status & Open Questions
 
 - Tool results are stored and replayed as plain text (the concatenated text parts of the tool output).
-- Tool-call failure signaling to the UI (`isError`) is defined in the event model but not yet backed by a consistent convention across native tools.
-- Multi-turn behavior when a tool itself errors out (does it end the run, or let the model retry?) is still being validated against Rig's actual behavior.
-- Runs are persisted (status, provider, model, error) but not yet shown in the UI, and a run cannot be cancelled.
+- `isError` is backed by Rig's hook for every tool. Only `echo` (empty text) fails on purpose so far; a fatal failure that should stop the run (as opposed to a business error) has no convention yet.
+- Whether the model retries after a failed call, and how a run behaves when a tool errors out, was checked in Rig's source and tests only, not against a real model.
+- Runs are persisted (status, provider, model, error); `failed` and `cancelled` ones are shown in the thread.
+- A run can be stopped (see below); a tool executing at that moment is abandoned, which will matter for tools with side effects.
 
 This document reflects the target shape of the agent boundary; implementation details (event payload shapes, exact Rig APIs) live in code, not here.
