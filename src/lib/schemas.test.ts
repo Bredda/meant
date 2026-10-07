@@ -19,3 +19,11 @@ describe("preferencesSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("preferencesSchema theme", () => {
+  it("only accepts the themes the backend knows", () => {
+    expect(
+      preferencesSchema.safeParse({ username: "neo", theme: "sepia" }).success
+    ).toBe(false);
+  });
+});

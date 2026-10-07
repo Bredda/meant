@@ -34,6 +34,7 @@ import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "@/config/providers";
 import { useUpdateConfig } from "@/hooks/use-config-update";
 import { storeSecret } from "@/hooks/use-secrets";
 import { errorMessage } from "@/lib/errors";
+import { preferencesSchema } from "@/lib/schemas";
 import type { AppConfig } from "@/lib/types";
 
 const formSchema = z
@@ -41,15 +42,8 @@ const formSchema = z
     ...(Object.fromEntries(
       PROVIDERS.map((p) => [p.id, z.string().optional()])
     ) as Record<ProviderId, z.ZodOptional<z.ZodString>>),
-    username: z
-      .string()
-      .min(3, "Username must be at least 3 characters.")
-      .max(10, "Username must be at most 10 characters.")
-      .regex(
-        /^[a-zA-Z0-9_]+$/,
-        "Username can only contain letters, numbers, and underscores."
-      ),
-    theme: z.string(),
+    username: preferencesSchema.shape.username,
+    theme: preferencesSchema.shape.theme,
   })
   .partial()
   .superRefine((data, ctx) => {
@@ -119,7 +113,7 @@ export function SplashForm({ onComplete }: SplashFormProps) {
         }
 
         const config = await update({
-          theme: value.theme as Theme,
+          theme: value.theme,
           username: value.username,
         });
 
@@ -197,7 +191,9 @@ export function SplashForm({ onComplete }: SplashFormProps) {
                     </FieldContent>
                     <Select
                       name={field.name}
-                      onValueChange={field.handleChange}
+                      onValueChange={(value) =>
+                        field.handleChange(value as Theme)
+                      }
                       value={field.state.value}
                     >
                       <SelectTrigger

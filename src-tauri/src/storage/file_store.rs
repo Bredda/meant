@@ -83,7 +83,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::AppConfig;
+    use crate::config::{AppConfig, Theme};
     use crate::storage::codec::TomlCodec;
 
     #[test]
@@ -104,7 +104,7 @@ mod tests {
             AtomicFileStore::new(dir.path().join("config.toml"));
 
         let config = AppConfig {
-            theme: "dark".to_string(),
+            theme: Theme::Dark,
             username: "toto".to_string(),
         };
         store.save(&config).unwrap();
@@ -135,10 +135,10 @@ mod tests {
 
         let updated = store
             .update(|config| {
-                config.theme = "light".to_string();
+                config.theme = Theme::Light;
             })
             .unwrap();
 
-        assert_eq!(updated.theme, "light");
+        assert_eq!(updated.theme, Theme::Light);
     }
 }

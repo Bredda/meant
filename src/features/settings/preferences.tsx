@@ -46,7 +46,7 @@ export function PreferencesForm() {
     onSubmit: async ({ value }) => {
       setBackError(null);
       try {
-        await update({ theme: value.theme as Theme, username: value.username });
+        await update({ theme: value.theme, username: value.username });
         toast.success("Preferences saved");
       } catch (_error) {
         console.error(_error);
@@ -126,7 +126,9 @@ export function PreferencesForm() {
                       </FieldContent>
                       <Select
                         name={field.name}
-                        onValueChange={field.handleChange}
+                        onValueChange={(value) =>
+                          field.handleChange(value as Theme)
+                        }
                         value={field.state.value}
                       >
                         <SelectTrigger

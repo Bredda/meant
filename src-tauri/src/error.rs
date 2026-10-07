@@ -39,6 +39,9 @@ pub enum AppError {
     NotFound(String),
 
     #[error("{0}")]
+    InvalidInput(String),
+
+    #[error("{0}")]
     Internal(String),
 }
 
@@ -53,6 +56,7 @@ impl AppError {
             Self::Db(_) => ErrorKind::Db,
             Self::Agent(error) => error.kind(),
             Self::NotFound(_) => ErrorKind::NotFound,
+            Self::InvalidInput(_) => ErrorKind::InvalidInput,
             Self::Internal(_) => ErrorKind::Internal,
         }
     }
