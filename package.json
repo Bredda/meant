@@ -1,6 +1,6 @@
 {
   "name": "meant",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Local-first AI workbench",
   "homepage": "https://github.com/Bredda/Meant?tab=readme-ov-file",
   "author": "Bredda <mangin.laurent@gmail.com>",
@@ -42,6 +42,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@tailwindcss/typography": "^0.5.20",
     "@tauri-apps/cli": "^2.9.5",
     "@types/node": "^25.4.0",

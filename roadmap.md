@@ -35,7 +35,7 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 | 7 | Agents configurables | Plus tard | Un seul agent implicite (préambule codé en dur) |
 | 8 | Modèles locaux | Plus tard | Pas commencé |
 | 9 | Connaissances locales | Plus tard | Pas commencé |
-| 10 | Distribution | Plus tard | Builds locaux seulement |
+| 10 | Distribution | En cours | Flux de release en place (release-please, installeurs Linux, Windows et macOS en CI), installeurs non signés, pas de mise à jour automatique |
 
 ## 1. Socle du projet
 
@@ -115,7 +115,9 @@ Disponible (fusionné dans `main`) : écran d'amorçage (vault, configuration), 
 
 **But :** installer et mettre à jour Meant sans passer par le code source.
 
-À faire : builds Windows, macOS et Linux en CI, signature, mise à jour automatique (désactivable, en accord avec le principe local d'abord), page de release.
+Fait : release-please (PR de release avec changelog et version, déclenchée en la fusionnant), builds Windows, macOS (arm64 et x64) et Linux attachés à la release GitHub, Conventional Commits imposés par commitlint (`reference/release.md`). Le job de build n'a pas encore tourné : le premier tag sera son test.
+
+À faire : signature (certificat Windows, Apple Developer ID et notarisation), mise à jour automatique (désactivable, en accord avec le principe local d'abord, avec clés de l'updater), jeton `RELEASE_PLEASE_TOKEN` et protection de `main`.
 
 **Terminé quand :** une version taguée produit des installeurs signés téléchargeables, et une version installée se met à jour après confirmation.
 
