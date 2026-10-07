@@ -56,7 +56,12 @@ export type ToolCallCompletedEvent = {
 
 export type RunCompletedEvent = {
   type: "RunCompleted";
-  data: { threadId: string; messages: ThreadMessage[] };
+  data: {
+    threadId: string;
+    /** `cancelled` when the user stopped the run: messages are what it had produced. */
+    status: "completed" | "cancelled";
+    messages: ThreadMessage[];
+  };
 } & BaseAgentEvent;
 
 export type ErrorEvent = {
@@ -106,6 +111,8 @@ export type ThreadToolResult = {
   toolCallId: string;
   toolName: string;
   content: string;
+  /** The call failed: the model saw `content` as its result and went on. */
+  isError: boolean;
 } & ThreadBaseMessage;
 
 export type ThreadMessage =
@@ -113,6 +120,17 @@ export type ThreadMessage =
   | ThreadAssistantMessage
   | ThreadToolCall
   | ThreadToolResult;
+
+/** Mirrors `RunSummary` in src-tauri/src/db/models.rs. */
+export type RunSummary = {
+  id: string;
+  provider: string;
+  model: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  error: string | null;
+  startedAt: number;
+  endedAt: number | null;
+};
 
 export type Thread = {
   id: string;

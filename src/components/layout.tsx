@@ -1,11 +1,13 @@
 import { Outlet, useLoaderData } from "react-router";
 import { ThreadProvider } from "@/features/threads/thread-context";
+import { useThreadTitleUpdates } from "@/hooks/use-thread-title-updates";
 import type { Thread } from "@/lib/types";
 import { AppSidebar } from "./sidebar/app-sidebar";
 import { SiteHeader } from "./sidebar/site-header";
 import { SidebarInset, SidebarProvider } from "./ui/sidebar";
 
 export function AppLayout() {
+  useThreadTitleUpdates();
   const threads = useLoaderData<Thread[]>();
   return (
     <ThreadProvider>

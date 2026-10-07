@@ -5,12 +5,15 @@ use crate::ai::agent::{
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+use super::registry::CancelSignal;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RunStatus {
     Running,
     Completed,
     Failed,
+    Cancelled,
 }
 
 impl RunStatus {
@@ -20,6 +23,7 @@ impl RunStatus {
             Self::Running => "running",
             Self::Completed => "completed",
             Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
         }
     }
 }
@@ -48,9 +52,10 @@ where
         &self,
         run: Run,
         messages: Vec<ThreadMessage>,
+        cancel: CancelSignal,
         emit: AgentEmitter,
     ) -> Result<RunResult, AgentError> {
-        let context = AgentContext { messages };
+        let context = AgentContext { messages, cancel };
 
         match self.agent.run(&run, context, &emit).await {
             Ok(result) => Ok(result),
@@ -76,6 +81,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
+    use crate::ai::agent::runtime::RunOutcome;
 
     struct FailingRuntime;
 
@@ -104,12 +110,63 @@ mod tests {
             status: RunStatus::Running,
         };
 
-        let result =
-            tauri::async_runtime::block_on(RunService::new(FailingRuntime).run(run, vec![], emit));
+        let result = tauri::async_runtime::block_on(RunService::new(FailingRuntime).run(
+            run,
+            vec![],
+            CancelSignal::never(),
+            emit,
+        ));
 
         assert!(matches!(result, Err(AgentError::Provider(_))));
         let events = events.lock().unwrap();
         assert_eq!(events.len(), 1);
         assert!(matches!(events[0], AgentEvent::Error { .. }));
+    }
+
+    /// Waits for the stop request, as a runtime blocked on the model would.
+    struct WaitsForCancel;
+
+    #[async_trait::async_trait]
+    impl AgentRuntime for WaitsForCancel {
+        async fn run(
+            &self,
+            _run: &Run,
+            mut context: AgentContext,
+            _emit: &AgentEmitter,
+        ) -> Result<RunResult, AgentError> {
+            context.cancel.cancelled().await;
+            Ok(RunResult {
+                messages: vec![],
+                outcome: RunOutcome::Cancelled,
+            })
+        }
+    }
+
+    #[test]
+    fn a_stopped_run_ends_as_cancelled_without_an_error_event() {
+        let registry = crate::runs::registry::RunRegistry::default();
+        let (_guard, cancel) = registry.register("r1", "t1").unwrap();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let emit: AgentEmitter = Box::new({
+            let events = Arc::clone(&events);
+            move |event| events.lock().unwrap().push(event)
+        });
+        let run = Run {
+            id: "r1".into(),
+            thread_id: "t1".into(),
+            status: RunStatus::Running,
+        };
+        registry.cancel("r1");
+
+        let result = tauri::async_runtime::block_on(RunService::new(WaitsForCancel).run(
+            run,
+            vec![],
+            cancel,
+            emit,
+        ))
+        .unwrap();
+
+        assert_eq!(result.outcome.status().as_str(), "cancelled");
+        assert!(events.lock().unwrap().is_empty());
     }
 }

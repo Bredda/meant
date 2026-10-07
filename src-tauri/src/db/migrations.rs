@@ -6,6 +6,8 @@ use rusqlite::Connection;
 const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_runs.sql"),
+    include_str!("migrations/0003_thread_title_source.sql"),
+    include_str!("migrations/0004_message_is_error.sql"),
 ];
 
 /// Applies every pending migration, each in its own transaction together with
@@ -77,6 +79,34 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM threads", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn existing_titles_are_not_replaceable_unless_still_the_placeholder() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(include_str!("migrations/0001_init.sql"))
+            .unwrap();
+        connection
+            .execute_batch(
+                "INSERT INTO threads VALUES ('t1', 'New thread', 0, 0);
+                 INSERT INTO threads VALUES ('t2', 'My title', 0, 0);",
+            )
+            .unwrap();
+
+        migrate(&mut connection).unwrap();
+
+        let source = |id: &str| -> String {
+            connection
+                .query_row(
+                    "SELECT title_source FROM threads WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .unwrap()
+        };
+        assert_eq!(source("t1"), "default");
+        assert_eq!(source("t2"), "manual");
     }
 
     #[test]

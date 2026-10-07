@@ -6,7 +6,7 @@ import { useThread } from "../../features/threads/thread-context";
 export function NewThreadPage() {
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const { isBusy, sendMessage, reset } = useThread();
+  const { isBusy, cancelRun, sendMessage, reset } = useThread();
 
   useEffect(() => {
     reset();
@@ -30,6 +30,7 @@ export function NewThreadPage() {
       <ThreadInput
         className="my-auto max-w-3xl"
         isBusy={isBusy}
+        onCancel={cancelRun}
         onSubmit={handleSubmit}
       />
     </div>

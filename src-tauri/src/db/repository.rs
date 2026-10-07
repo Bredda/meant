@@ -6,7 +6,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::db::{
     error::DbError,
     migrations,
-    models::{NewMessage, NewRun, StoredThreadMessage, Thread},
+    models::{NewMessage, NewRun, RunSummary, StoredThreadMessage, Thread},
 };
 
 pub struct ThreadRepository {
@@ -42,10 +42,12 @@ impl ThreadRepository {
         self.connection.lock().map_err(|_| DbError::Poisoned)
     }
 
-    pub fn create_thread(&self) -> Result<Thread, DbError> {
+    /// Creates a thread with a provisional title (`title_source = 'default'`),
+    /// which a generated title may still replace.
+    pub fn create_thread(&self, title: &str) -> Result<Thread, DbError> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp();
-        let title = "New thread".to_string();
+        let title = title.to_string();
 
         self.lock()?.execute(
             r#"
@@ -66,6 +68,59 @@ impl ThreadRepository {
             created_at: now,
             updated_at: now,
         })
+    }
+
+    /// Sets a title typed by the user. It does not touch `updated_at`: renaming
+    /// is not activity, and the list is ordered by last activity. Returns the
+    /// updated thread, `None` if it does not exist.
+    pub fn rename_thread(&self, thread_id: &str, title: &str) -> Result<Option<Thread>, DbError> {
+        let updated = self.lock()?.execute(
+            "UPDATE threads SET title = ?2, title_source = 'manual' WHERE id = ?1",
+            params![thread_id, title],
+        )?;
+
+        if updated == 0 {
+            return Ok(None);
+        }
+        self.get_thread(thread_id)
+    }
+
+    /// Sets a generated title, unless the user has renamed the thread or it
+    /// already got one in the meantime (the model call takes seconds).
+    /// Returns the updated thread, `None` when the title was left alone.
+    pub fn set_auto_title(&self, thread_id: &str, title: &str) -> Result<Option<Thread>, DbError> {
+        let updated = self.lock()?.execute(
+            "UPDATE threads SET title = ?2, title_source = 'auto'
+             WHERE id = ?1 AND title_source = 'default'",
+            params![thread_id, title],
+        )?;
+
+        if updated == 0 {
+            return Ok(None);
+        }
+        self.get_thread(thread_id)
+    }
+
+    /// Whether the thread still carries its provisional title.
+    pub fn has_provisional_title(&self, thread_id: &str) -> Result<bool, DbError> {
+        let source: Option<String> = self
+            .lock()?
+            .query_row(
+                "SELECT title_source FROM threads WHERE id = ?1",
+                params![thread_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(source.as_deref() == Some("default"))
+    }
+
+    /// Deletes a thread; its messages and runs go with it (foreign keys).
+    /// Returns whether it existed.
+    pub fn delete_thread(&self, thread_id: &str) -> Result<bool, DbError> {
+        let deleted = self
+            .lock()?
+            .execute("DELETE FROM threads WHERE id = ?1", params![thread_id])?;
+        Ok(deleted > 0)
     }
 
     pub fn get_thread(&self, thread_id: &str) -> Result<Option<Thread>, DbError> {
@@ -128,6 +183,34 @@ impl ThreadRepository {
         Ok(())
     }
 
+    /// A thread's runs, oldest first.
+    pub fn list_runs(&self, thread_id: &str) -> Result<Vec<RunSummary>, DbError> {
+        let connection = self.lock()?;
+
+        let mut statement = connection.prepare(
+            r#"
+                SELECT id, provider, model, status, error, started_at, ended_at
+                FROM runs
+                WHERE thread_id = ?1
+                ORDER BY started_at ASC, rowid ASC
+                "#,
+        )?;
+
+        let rows = statement.query_map(params![thread_id], |row| {
+            Ok(RunSummary {
+                id: row.get(0)?,
+                provider: row.get(1)?,
+                model: row.get(2)?,
+                status: row.get(3)?,
+                error: row.get(4)?,
+                started_at: row.get(5)?,
+                ended_at: row.get(6)?,
+            })
+        })?;
+
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
     pub fn add_message(
         &self,
         thread_id: &str,
@@ -148,9 +231,45 @@ impl ThreadRepository {
         run_id: Option<&str>,
         messages: &[NewMessage],
     ) -> Result<Vec<StoredThreadMessage>, DbError> {
+        self.write_messages(thread_id, run_id, messages, None)
+    }
+
+    /// Replaces every message after the one at `position` (the message a
+    /// regenerated run answers) with `messages`, all or nothing: a failure
+    /// leaves the previous answer in place. That message is handed over to
+    /// `run_id`, so an earlier run that failed or was stopped on it no longer
+    /// claims it (and its notice goes away with it).
+    pub fn replace_messages_after(
+        &self,
+        thread_id: &str,
+        position: i64,
+        run_id: &str,
+        messages: &[NewMessage],
+    ) -> Result<Vec<StoredThreadMessage>, DbError> {
+        self.write_messages(thread_id, Some(run_id), messages, Some(position))
+    }
+
+    fn write_messages(
+        &self,
+        thread_id: &str,
+        run_id: Option<&str>,
+        messages: &[NewMessage],
+        replace_after: Option<i64>,
+    ) -> Result<Vec<StoredThreadMessage>, DbError> {
         let mut connection = self.lock()?;
         let transaction = connection.transaction()?;
         let now = chrono::Utc::now().timestamp();
+
+        if let Some(position) = replace_after {
+            transaction.execute(
+                "DELETE FROM messages WHERE thread_id = ?1 AND position > ?2",
+                params![thread_id, position],
+            )?;
+            transaction.execute(
+                "UPDATE messages SET run_id = ?3 WHERE thread_id = ?1 AND position = ?2",
+                params![thread_id, position, run_id],
+            )?;
+        }
 
         let first_position: i64 = transaction.query_row(
             "SELECT COALESCE(MAX(position), -1) + 1 FROM messages WHERE thread_id = ?1",
@@ -170,10 +289,11 @@ impl ThreadRepository {
                         content,
                         tool_call_id,
                         tool_name,
+                        is_error,
                         position,
                         created_at
                     )
-                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                     "#,
                 params![
                     message.id,
@@ -183,6 +303,7 @@ impl ThreadRepository {
                     message.content,
                     message.tool_call_id,
                     message.tool_name,
+                    message.is_error,
                     position,
                     now
                 ],
@@ -196,6 +317,7 @@ impl ThreadRepository {
                 content: message.content.clone(),
                 tool_call_id: message.tool_call_id.clone(),
                 tool_name: message.tool_name.clone(),
+                is_error: message.is_error,
                 position,
                 created_at: now,
             });
@@ -223,6 +345,7 @@ impl ThreadRepository {
                     content,
                     tool_call_id,
                     tool_name,
+                    is_error,
                     position,
                     created_at
                 FROM messages
@@ -240,8 +363,9 @@ impl ThreadRepository {
                 content: row.get(4)?,
                 tool_call_id: row.get(5)?,
                 tool_name: row.get(6)?,
-                position: row.get(7)?,
-                created_at: row.get(8)?,
+                is_error: row.get(7)?,
+                position: row.get(8)?,
+                created_at: row.get(9)?,
             })
         })?;
 
@@ -303,6 +427,7 @@ mod tests {
             content: id.into(),
             tool_call_id: None,
             tool_name: None,
+            is_error: false,
         }
     }
 
@@ -318,7 +443,7 @@ mod tests {
     #[test]
     fn appended_messages_follow_existing_positions() {
         let repo = repository();
-        let thread = repo.create_thread().unwrap();
+        let thread = repo.create_thread("Title").unwrap();
         repo.start_run(&run("r1", &thread.id)).unwrap();
         repo.add_message(&thread.id, Some("r1"), &text("u1", "user"))
             .unwrap();
@@ -346,9 +471,114 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_tool_result_stays_flagged_once_stored() {
+        let repo = repository();
+        let thread = repo.create_thread("Title").unwrap();
+        let tool_result = |id: &str, is_error| NewMessage {
+            role: "tool_result",
+            tool_call_id: Some(format!("call-{id}")),
+            tool_name: Some("echo".into()),
+            is_error,
+            ..text(id, "tool_result")
+        };
+
+        repo.append_messages(
+            &thread.id,
+            None,
+            &[
+                text("u1", "user"),
+                tool_result("ok", false),
+                tool_result("bad", true),
+            ],
+        )
+        .unwrap();
+
+        let flags: Vec<_> = repo
+            .get_messages(&thread.id)
+            .unwrap()
+            .iter()
+            .map(|m| (m.id.clone(), m.is_error))
+            .collect();
+        assert_eq!(
+            flags,
+            [
+                ("u1".to_string(), false),
+                ("ok".to_string(), false),
+                ("bad".to_string(), true)
+            ]
+        );
+    }
+
+    fn ids(repo: &ThreadRepository, thread_id: &str) -> Vec<(String, Option<String>)> {
+        repo.get_messages(thread_id)
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.id, m.run_id))
+            .collect()
+    }
+
+    #[test]
+    fn replacing_swaps_the_answer_and_hands_the_question_to_the_new_run() {
+        let repo = repository();
+        let thread = repo.create_thread("Title").unwrap();
+        repo.start_run(&run("r1", &thread.id)).unwrap();
+        repo.start_run(&run("r2", &thread.id)).unwrap();
+        repo.append_messages(
+            &thread.id,
+            Some("r1"),
+            &[
+                text("u1", "user"),
+                text("a1", "assistant"),
+                text("a1b", "assistant"),
+            ],
+        )
+        .unwrap();
+
+        let stored = repo
+            .replace_messages_after(&thread.id, 0, "r2", &[text("a2", "assistant")])
+            .unwrap();
+
+        assert_eq!(stored[0].position, 1);
+        assert_eq!(
+            ids(&repo, &thread.id),
+            [
+                ("u1".to_string(), Some("r2".to_string())),
+                ("a2".to_string(), Some("r2".to_string()))
+            ]
+        );
+    }
+
+    #[test]
+    fn a_failed_replacement_keeps_the_previous_answer() {
+        let repo = repository();
+        let thread = repo.create_thread("Title").unwrap();
+        repo.start_run(&run("r2", &thread.id)).unwrap();
+        repo.append_messages(
+            &thread.id,
+            None,
+            &[text("u1", "user"), text("a1", "assistant")],
+        )
+        .unwrap();
+
+        // Same id twice: the second insert violates the primary key.
+        let result = repo.replace_messages_after(
+            &thread.id,
+            0,
+            "r2",
+            &[text("a2", "assistant"), text("a2", "assistant")],
+        );
+
+        assert!(result.is_err());
+        assert_eq!(
+            ids(&repo, &thread.id),
+            [("u1".to_string(), None), ("a1".to_string(), None)]
+        );
+    }
+
+    #[test]
     fn a_failed_append_writes_nothing() {
         let repo = repository();
-        let thread = repo.create_thread().unwrap();
+        let thread = repo.create_thread("Title").unwrap();
 
         // Same id twice: the second insert violates the primary key.
         let result = repo.append_messages(
@@ -361,10 +591,126 @@ mod tests {
         assert!(repo.get_messages(&thread.id).unwrap().is_empty());
     }
 
+    fn title_source(repo: &ThreadRepository, thread_id: &str) -> String {
+        repo.lock()
+            .unwrap()
+            .query_row(
+                "SELECT title_source FROM threads WHERE id = ?1",
+                params![thread_id],
+                |row| row.get(0),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn renaming_marks_the_title_manual_and_keeps_the_order_key() {
+        let repo = repository();
+        let thread = repo.create_thread("Provisional").unwrap();
+        assert_eq!(title_source(&repo, &thread.id), "default");
+
+        let renamed = repo.rename_thread(&thread.id, "Mine").unwrap().unwrap();
+
+        assert_eq!(renamed.title, "Mine");
+        assert_eq!(renamed.updated_at, thread.updated_at);
+        assert_eq!(title_source(&repo, &thread.id), "manual");
+        assert!(repo.rename_thread("missing", "x").unwrap().is_none());
+    }
+
+    #[test]
+    fn a_generated_title_never_replaces_the_users() {
+        let repo = repository();
+        let untouched = repo.create_thread("Provisional").unwrap();
+        let renamed = repo.create_thread("Provisional").unwrap();
+        repo.rename_thread(&renamed.id, "Mine").unwrap();
+
+        let generated = repo.set_auto_title(&untouched.id, "Generated").unwrap();
+
+        assert_eq!(generated.unwrap().title, "Generated");
+        assert!(repo
+            .set_auto_title(&renamed.id, "Generated")
+            .unwrap()
+            .is_none());
+        assert_eq!(repo.get_thread(&renamed.id).unwrap().unwrap().title, "Mine");
+        // Titled once: a second generation (or a rename race) changes nothing.
+        assert!(repo
+            .set_auto_title(&untouched.id, "Again")
+            .unwrap()
+            .is_none());
+        assert!(!repo.has_provisional_title(&untouched.id).unwrap());
+        assert!(!repo.has_provisional_title("missing").unwrap());
+    }
+
+    #[test]
+    fn deleting_a_thread_removes_its_messages_and_runs() {
+        let repo = repository();
+        let thread = repo.create_thread("Title").unwrap();
+        let other = repo.create_thread("Other").unwrap();
+        repo.start_run(&run("r1", &thread.id)).unwrap();
+        repo.add_message(&thread.id, Some("r1"), &text("u1", "user"))
+            .unwrap();
+        repo.add_message(&other.id, None, &text("u2", "user"))
+            .unwrap();
+
+        assert!(repo.delete_thread(&thread.id).unwrap());
+
+        assert!(repo.get_thread(&thread.id).unwrap().is_none());
+        assert!(repo.get_messages(&thread.id).unwrap().is_empty());
+        let runs: i64 = repo
+            .lock()
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM runs", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(runs, 0);
+        assert_eq!(repo.get_messages(&other.id).unwrap().len(), 1);
+        assert!(!repo.delete_thread(&thread.id).unwrap());
+    }
+
+    #[test]
+    fn runs_are_listed_per_thread_oldest_first() {
+        let repo = repository();
+        let thread = repo.create_thread("Title").unwrap();
+        let other = repo.create_thread("Other").unwrap();
+        repo.start_run(&run("r1", &thread.id)).unwrap();
+        repo.start_run(&run("r2", &thread.id)).unwrap();
+        repo.start_run(&run("r3", &other.id)).unwrap();
+        repo.finish_run("r1", "failed", Some("Provider error: 401"))
+            .unwrap();
+
+        let runs = repo.list_runs(&thread.id).unwrap();
+
+        let summary: Vec<_> = runs
+            .iter()
+            .map(|r| (r.id.as_str(), r.status.as_str(), r.error.as_deref()))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("r1", "failed", Some("Provider error: 401")),
+                ("r2", "running", None)
+            ]
+        );
+        assert!(runs[0].ended_at.is_some() && runs[1].ended_at.is_none());
+    }
+
+    #[test]
+    fn a_run_interrupted_by_a_crash_is_failed_on_next_start() {
+        let path = tempfile::tempdir().unwrap();
+        let first = ThreadRepository::new(path.path()).unwrap();
+        let thread = first.create_thread("Title").unwrap();
+        first.start_run(&run("r1", &thread.id)).unwrap();
+        drop(first);
+
+        let second = ThreadRepository::new(path.path()).unwrap();
+
+        let runs = second.list_runs(&thread.id).unwrap();
+        assert_eq!(runs[0].status, "failed");
+        assert_eq!(runs[0].error.as_deref(), Some("Interrupted"));
+    }
+
     #[test]
     fn a_run_records_its_outcome() {
         let repo = repository();
-        let thread = repo.create_thread().unwrap();
+        let thread = repo.create_thread("Title").unwrap();
         repo.start_run(&run("r1", &thread.id)).unwrap();
         assert_eq!(repo.run_status("r1").0, "running");
 

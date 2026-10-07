@@ -4,6 +4,7 @@ use crate::{
     ai::agent::runtime::AgentError,
     db::models::{StoredThreadMessage, Thread},
     error::ErrorKind,
+    runs::service::RunStatus,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -48,9 +49,12 @@ pub enum AgentEvent {
         content: String,
         is_error: bool,
     },
+    /// Terminal event of a run that did not fail: `completed`, or `cancelled`
+    /// when the user stopped it (the messages are what it had produced).
     RunCompleted {
         thread_id: String,
         run_id: String,
+        status: RunStatus,
         messages: Vec<StoredThreadMessage>,
     },
     Error {
@@ -88,6 +92,9 @@ pub enum ThreadMessage {
         tool_name: String,
         /// The text the model sees, stored as is.
         content: String,
+        /// The call failed (error, refusal or skipped): the model still gets
+        /// `content`, the UI marks the call as failed.
+        is_error: bool,
     },
 }
 
@@ -143,6 +150,7 @@ impl TryFrom<StoredThreadMessage> for ThreadMessage {
                     tool_call_id,
                     tool_name,
                     content,
+                    is_error: message.is_error,
                 })
             }
 
@@ -187,6 +195,7 @@ mod tests {
             content: content.into(),
             tool_call_id: Some("c1".into()),
             tool_name: Some("echo".into()),
+            is_error: false,
         }
     }
 
@@ -262,6 +271,41 @@ mod tests {
             })
         );
         assert!(message.get("threadId").is_some() && message.get("toolCallId").is_some());
+        assert_eq!(message.get("isError"), Some(&serde_json::json!(false)));
+    }
+
+    #[test]
+    fn a_failed_tool_result_row_loads_as_failed() {
+        let row = StoredThreadMessage {
+            is_error: true,
+            ..stored_result("Invalid input: text must not be empty")
+        };
+
+        assert!(matches!(
+            ThreadMessage::try_from(row).unwrap(),
+            ThreadMessage::ToolResult { is_error: true, .. }
+        ));
+    }
+
+    #[test]
+    fn a_stopped_run_completes_with_its_status() {
+        let event = AgentEvent::RunCompleted {
+            thread_id: "t1".into(),
+            run_id: "r1".into(),
+            status: RunStatus::Cancelled,
+            messages: vec![],
+        };
+
+        assert_eq!(
+            serde_json::to_value(event).unwrap(),
+            serde_json::json!({
+                "type": "RunCompleted",
+                "data": {
+                    "threadId": "t1", "runId": "r1",
+                    "status": "cancelled", "messages": []
+                }
+            })
+        );
     }
 
     #[test]

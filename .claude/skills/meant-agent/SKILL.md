@@ -15,15 +15,17 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
        commands/chat.rs
          ├─ resolve or create thread (emits ThreadCreated)
          ├─ state.default_provider()                         (fails before anything is written)
+         ├─ state.runs.register → guard + CancelSignal        (one run per thread)
          ├─ threads.start_run → runs row `running`
          ├─ execute_run:
          │    ├─ persist the user message (with run_id)
          │    ├─ load history → Vec<ThreadMessage>
          │    ├─ state.agent(provider)                         (cached, built from the vault)
-         │    ├─ RunService::run → ReActAgent::run             (streams events)
-         │    ├─ threads.append_messages (one transaction)
-         │    └─ emit RunCompleted { messages: persisted rows incl. the user message }
-         └─ threads.finish_run → `completed` or `failed` + error
+         │    ├─ RunService::run → ReActAgent::run             (streams events; stops on the CancelSignal)
+         │    ├─ threads.append_messages (one transaction)     (partial output too when cancelled)
+         │    └─ emit RunCompleted { status, messages: persisted rows incl. the user message }
+         └─ threads.finish_run → `completed`, `cancelled` or `failed` + error
+cancel_run { runId } → state.runs.cancel → the run above ends as `cancelled` (not an error)
 ```
 
 ## Invariants (do not break)
@@ -32,7 +34,8 @@ ThreadProvider.sendMessage (src/features/threads/thread-context.tsx)
 - **Tool calls are matched by `tool_call_id`**, never by row id.
 - **RunCompleted is authoritative**: the UI sets `messages = [...preRunSnapshot, ...event.data.messages]` and drops the live view. Anything the live view shows must be derivable from persisted rows after completion.
 - **Events are ordered per run** and carry `runId` and `threadId`. A run remembers its own thread; when the user opens another one, `isRunDisplayed` (`run-reducer.ts`) keeps its events away from the displayed messages, and only the run lifecycle (busy, end, list refresh) is applied.
-- **Errors are emitted once.** `RunService` emits `Error` (with a `kind`); the runtime only returns `Err`; the UI ignores the `invoke` rejection once an `Error` event ended the run. After a failure the UI reloads the persisted rows and keeps the warning (`reloadAfterFailure`).
+- **Errors are emitted once.** `RunService` emits `Error` (with a `kind`); the runtime only returns `Err`; the UI ignores the `invoke` rejection once an `Error` event ended the run. After a failure the UI reloads the persisted rows and runs once `invoke` has settled (`reloadAfterFailure`): the run row is closed after the event, so reloading on the event would read it `running`. The same goes for the route refresh after a run: it happens when `chat` resolves, not on `RunCompleted`.
+- **A stopped run is not a failure.** `cancel_run` fires the run's `CancelSignal`; `ReActAgent` selects on it while waiting for the next stream item, closes the open text segment and drops tool calls that have no result (`drop_unanswered_tool_calls`: an unanswered call makes the history invalid for providers). What was produced is stored and `RunCompleted` carries `status: "cancelled"`; no `Error` event. A tool executing at that moment is abandoned (its future is dropped): a tool with side effects (axis 5) will need its own cleanup.
 
 ## Changing an event or message shape
 

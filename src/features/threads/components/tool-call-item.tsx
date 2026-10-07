@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleXIcon, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { ThreadToolCall, ThreadToolResult } from "@/lib/types";
 import { formatJson } from "@/lib/utils";
@@ -12,6 +12,7 @@ export function ToolCallItem({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = !result;
+  const isFailed = result?.isError === true;
 
   return (
     <div className="w-full max-w-md rounded-lg border bg-muted/40 text-sm">
@@ -26,9 +27,13 @@ export function ToolCallItem({
           }`}
         />
 
-        {isPending ? (
+        {isPending && (
           <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
-        ) : (
+        )}
+        {isFailed && (
+          <CircleXIcon className="size-4 shrink-0 text-destructive" />
+        )}
+        {!(isPending || isFailed) && (
           <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
         )}
 
@@ -36,8 +41,14 @@ export function ToolCallItem({
           {call.toolName}
         </span>
 
-        <span className="ml-auto text-muted-foreground text-xs">
-          {isPending ? "running…" : "done"}
+        <span
+          className={`ml-auto text-xs ${
+            isFailed ? "text-destructive" : "text-muted-foreground"
+          }`}
+        >
+          {isPending && "running…"}
+          {isFailed && "failed"}
+          {!(isPending || isFailed) && "done"}
         </span>
       </button>
 
