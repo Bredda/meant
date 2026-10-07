@@ -8,14 +8,17 @@ mod state;
 mod runs;
 mod config;
 mod storage;
+mod vault;
 
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 use db::ThreadRepository;
 use state::AppState;
 
-use crate::{ai::agent::react::ReActAgent, config::config_store, runs::service::RunService};
-
+use crate::{
+    config::config_store,
+    vault::keyring_store::KeyringStore,
+};
 
 fn main() {
      #[cfg(debug_assertions)]
@@ -30,33 +33,13 @@ fn main() {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             let store = config_store(&app_data_dir);
+            let vault = KeyringStore::new("meant");
+            let threads =
+                ThreadRepository::new(&app_data_dir).expect("Failed to initialize database");
 
-            let threads = 
-                ThreadRepository::new(&app_data_dir)
-            .   expect("Failed to initialize database");
-
-            match store.load() {
-                Ok(Some(config)) => {
-                    println!("config-loaded");
-                    app.handle().emit("config-loaded", &config)?;
-                }
-                Ok(None) => {
-                    println!("config-missing");
-                    app.handle().emit("config-missing", ())?;
-                }
-                Err(err) => {
-                    println!("config-error");
-                    app.handle().emit("config-error", err.to_string())?;
-                    
-                }
-            }
-            let agent = ReActAgent::new().expect("Failed to initialize AI agent");
-
-            app.manage(AppState {
-                agent: RunService::new(agent),
-                threads,
-                config_store: store,
-            });
+            // The agent is not built here: on a fresh install no API key exists
+            // yet. AppState builds it lazily from the vault on the first run.
+            app.manage(AppState::new(threads, store, vault));
 
             Ok(())
         })
@@ -66,6 +49,11 @@ fn main() {
             commands::list_threads::list_threads,
             commands::get_thread::get_thread,
             commands::update_config::update_config,
+            commands::setup::check_vault,
+            commands::setup::load_config,
+            commands::secrets::list_secrets,
+            commands::secrets::set_secret,
+            commands::secrets::delete_secret
             ]
         
         )

@@ -2,16 +2,11 @@ use futures::StreamExt;
 use rig::{
     agent::{
         MultiTurnStreamItem
-    }, 
-    client::{
-        AgentClientExt, 
-        ProviderClient
-    }, 
-    message::ToolResultContent, 
-    providers::anthropic, 
+    },
+    message::ToolResultContent,
     streaming::{
-        StreamedAssistantContent, 
-        StreamedUserContent::ToolResult, 
+        StreamedAssistantContent,
+        StreamedUserContent::ToolResult,
         StreamingChat,
     },
     completion::{
@@ -21,10 +16,7 @@ use rig::{
     }
 };
 
-use crate::{
-    runs::service::Run,
-    ai::tools::echo::Echo
-};
+use crate::runs::service::Run;
 use super::{
     types::{
         AgentEvent, 
@@ -44,29 +36,14 @@ pub struct ReActAgent {
 }
 
 impl ReActAgent {
-    pub fn new() -> Result<Self, AgentError> {
-        let client =
-            anthropic::Client::from_env()
-                .map_err(|e| {
-                    AgentError::Provider(
-                        e.to_string(),
-                    )
-                })?;
-
-        let  builder = client
-            .agent(
-                anthropic::completion::CLAUDE_SONNET_4_6,
-            )
-            .preamble(
-                "You are a helpful assistant. \
-                 Answer clearly and concisely.",
-            ).default_max_turns(5) .tool(Echo);
-
-        // Tools will be registered here.
-
-        let agent = builder.build();
-
-        Ok(Self { agent })
+    /// Wraps an already-assembled agent.
+    ///
+    /// Provider selection, credential lookup, and builder config (preamble,
+    /// tools, turn budget) all happen in `crate::ai::provider::build_agent`;
+    /// by the time an `Agent` reaches here it is provider-agnostic, so this
+    /// runtime doesn't need to be either.
+    pub fn new(agent: rig::agent::Agent) -> Self {
+        Self { agent }
     }
 }
 

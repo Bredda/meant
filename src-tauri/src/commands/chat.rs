@@ -9,6 +9,8 @@ use crate::{
 pub struct ChatRequest {
     pub thread_id: Option<String>,
     pub input: String,
+    pub model: String, // Eg. "anthropic/claude-sonnet-4.6" or "openai/gpt-5.1"
+    pub tools: Vec<String>, // Eg. ["echo"]
 }
 
 #[tauri::command]
@@ -18,7 +20,6 @@ pub async fn chat(
     channel: Channel<AgentEvent>,
 ) -> Result<(), String> {
     let run_id = uuid::Uuid::new_v4().to_string();
-    println!("New chat request");
 
     // Retrieves or creates thread based on optional request thread_id
     let thread = match request.thread_id {
@@ -68,8 +69,14 @@ pub async fn chat(
         status: RunStatus::Running,
     };
 
+    // TODO: no per-thread/per-message provider selection exists yet; this
+    // picks whichever configured provider comes first. Replace once threads
+    // (or the composer) can express which provider a run should use.
+    let provider = state.default_provider()?;
+
     let run_result = state
-        .agent
+        .agent(provider)
+        .await?
         .run(
             run,
             messages,
