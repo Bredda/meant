@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useTextBuffer } from "@/hooks/use-text-buffer";
 import type { AgentEvent, Thread, ThreadMessage } from "@/lib/types";
+import { isRunDisplayed, type RunAction, runReducer } from "./run-reducer";
 
 type SendMessageOptions = {
   onThreadCreated?: (thread: Thread) => void;
@@ -40,6 +41,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
    *
    * DO NOT use it for navigation purpose.
    */
+  // Thread currently displayed (set by hydrate/reset and by ThreadCreated).
   const threadIdRef = useRef<string | null>(null);
   const activeRunRef = useRef(false);
 
@@ -71,25 +73,9 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
    */
   const livePositionRef = useRef(0);
 
-  const updateMessages = useCallback(
-    (
-      updater:
-        | ThreadMessage[]
-        | ((messages: ThreadMessage[]) => ThreadMessage[])
-    ) => {
-      setMessages((previous) =>
-        typeof updater === "function" ? updater(previous) : updater
-      );
-    },
-    []
-  );
-
-  const appendMessage = useCallback(
-    (message: ThreadMessage) => {
-      updateMessages((previous) => [...previous, message]);
-    },
-    [updateMessages]
-  );
+  const dispatch = useCallback((action: RunAction) => {
+    setMessages((previous) => runReducer(previous, action));
+  }, []);
 
   const appendAssistantText = useCallback(
     (text: string) => {
@@ -99,68 +85,42 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      updateMessages((previous) =>
-        previous.map((item) => {
-          if (item.id !== messageId || item.role !== "assistant") {
-            return item;
-          }
-
-          return {
-            ...item,
-            content: item.content + text,
-          };
-        })
-      );
+      dispatch({ type: "appendText", messageId, text });
     },
-    [updateMessages]
+    [dispatch]
   );
 
   const textBuffer = useTextBuffer({
     onFlush: appendAssistantText,
   });
 
+  /** Ends the active run without touching the displayed messages. */
+  const endRun = useCallback(() => {
+    activeRunRef.current = false;
+    currentAssistantMessageIdRef.current = null;
+    setIsBusy(false);
+  }, []);
+
   const handleError = useCallback(
     (message: string) => {
       textBuffer.stop(true);
 
-      activeRunRef.current = false;
-
-      const messageId = currentAssistantMessageIdRef.current;
-
-      if (messageId) {
-        updateMessages((previous) =>
-          previous.map((item) => {
-            if (item.id !== messageId || item.role !== "assistant") {
-              return item;
-            }
-
-            return {
-              ...item,
-              content: item.content
-                ? `${item.content}\n\n⚠️ ${message}`
-                : `⚠️ ${message}`,
-            };
-          })
-        );
-      } else {
-        /**
-         * Error occured outside test segment
-         * (eg. while exeuting tool call)
-         * so we push a specific assistant message
-         */
-        appendMessage({
+      dispatch({
+        type: "fail",
+        messageId: currentAssistantMessageIdRef.current,
+        warning: message,
+        fallback: {
           id: crypto.randomUUID(),
           role: "assistant",
           content: `⚠️ ${message}`,
           position: livePositionRef.current++,
           thread_id: threadIdRef.current ?? "",
-        });
-      }
+        },
+      });
 
-      currentAssistantMessageIdRef.current = null;
-      setIsBusy(false);
+      endRun();
     },
-    [appendMessage, textBuffer, updateMessages]
+    [dispatch, endRun, textBuffer]
   );
 
   const sendMessage = useCallback(
@@ -179,16 +139,20 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       livePositionRef.current = messages.length;
       currentAssistantMessageIdRef.current = null;
 
-      // Optimistic user message
-      const userMessage: ThreadMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content,
-        position: livePositionRef.current++,
-        thread_id: threadIdRef.current ?? "",
-      };
+      // The thread this run belongs to, whatever the user opens meanwhile.
+      let runThreadId = threadIdRef.current;
 
-      updateMessages((previous) => [...previous, userMessage]);
+      // Optimistic user message
+      dispatch({
+        type: "append",
+        message: {
+          id: crypto.randomUUID(),
+          role: "user",
+          content,
+          position: livePositionRef.current++,
+          thread_id: runThreadId ?? "",
+        },
+      });
 
       activeRunRef.current = true;
       setIsBusy(true);
@@ -197,6 +161,25 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
       channel.onmessage = (event) => {
         console.debug("Received Thread event", event);
+
+        const displayed = isRunDisplayed(runThreadId, threadIdRef.current);
+
+        if (event.type === "ThreadCreated") {
+          runThreadId = event.data.thread.id;
+        }
+
+        if (!displayed) {
+          // The user opened another thread: keep only the run lifecycle, the
+          // persisted result shows up when they come back to this thread.
+          textBuffer.stop(false);
+          textBuffer.clear();
+          currentAssistantMessageIdRef.current = null;
+          if (event.type === "RunCompleted" || event.type === "Error") {
+            endRun();
+          }
+          return;
+        }
+
         switch (event.type) {
           case "ThreadCreated": {
             const newThread = event.data.thread;
@@ -223,12 +206,15 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
             currentAssistantMessageIdRef.current = message_id;
 
-            appendMessage({
-              id: message_id,
-              role: "assistant",
-              content: "",
-              position: livePositionRef.current++,
-              thread_id: threadIdRef.current ?? "",
+            dispatch({
+              type: "append",
+              message: {
+                id: message_id,
+                role: "assistant",
+                content: "",
+                position: livePositionRef.current++,
+                thread_id: runThreadId ?? "",
+              },
             });
 
             textBuffer.start();
@@ -254,14 +240,17 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
           case "ToolCallStarted": {
             const { tool_call_id, tool_name, arguments: args } = event.data;
 
-            appendMessage({
-              id: tool_call_id,
-              role: "tool_call",
-              tool_call_id,
-              tool_name,
-              content: args,
-              position: livePositionRef.current++,
-              thread_id: threadIdRef.current ?? "",
+            dispatch({
+              type: "append",
+              message: {
+                id: tool_call_id,
+                role: "tool_call",
+                tool_call_id,
+                tool_name,
+                content: args,
+                position: livePositionRef.current++,
+                thread_id: runThreadId ?? "",
+              },
             });
 
             break;
@@ -274,14 +263,17 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
               content: toolContent,
             } = event.data;
 
-            appendMessage({
-              id: `${tool_call_id}:result`,
-              role: "tool_result",
-              tool_call_id,
-              tool_name,
-              content: toolContent,
-              position: livePositionRef.current++,
-              thread_id: threadIdRef.current ?? "",
+            dispatch({
+              type: "append",
+              message: {
+                id: `${tool_call_id}:result`,
+                role: "tool_result",
+                tool_call_id,
+                tool_name,
+                content: toolContent,
+                position: livePositionRef.current++,
+                thread_id: runThreadId ?? "",
+              },
             });
 
             break;
@@ -294,11 +286,13 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
              * Updating : RunCompleted returned messages
              * are truth (stable DB ids). Live state is discarded.
              */
-            setMessages([...preRunMessagesRef.current, ...event.data.messages]);
+            dispatch({
+              type: "complete",
+              snapshot: preRunMessagesRef.current,
+              persisted: event.data.messages,
+            });
 
-            currentAssistantMessageIdRef.current = null;
-            activeRunRef.current = false;
-            setIsBusy(false);
+            endRun();
 
             break;
           }
@@ -316,7 +310,7 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
       try {
         await invoke("chat", {
           request: {
-            threadId: threadIdRef.current,
+            threadId: runThreadId,
             input: content,
           },
           channel,
@@ -328,10 +322,14 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
         if (!activeRunRef.current) {
           return;
         }
+        if (!isRunDisplayed(runThreadId, threadIdRef.current)) {
+          endRun();
+          return;
+        }
         handleError(error instanceof Error ? error.message : String(error));
       }
     },
-    [appendMessage, handleError, messages, textBuffer, updateMessages]
+    [dispatch, endRun, handleError, messages, textBuffer]
   );
 
   //Hydrates provider from /threads/:id loader.
@@ -352,16 +350,18 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 
   // Local reset. No navigation
   const reset = useCallback(() => {
+    threadIdRef.current = null;
+    setThread(null);
+    setMessages([]);
+
+    // A run still streaming keeps its own state: its events stop touching
+    // the display (isRunDisplayed) and it ends on RunCompleted or Error.
     if (activeRunRef.current) {
       return;
     }
 
-    threadIdRef.current = null;
     currentAssistantMessageIdRef.current = null;
     preRunMessagesRef.current = [];
-
-    setThread(null);
-    setMessages([]);
     setIsBusy(false);
   }, []);
 
