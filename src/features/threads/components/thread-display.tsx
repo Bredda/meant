@@ -14,9 +14,9 @@ import {
   assistantDisplay,
   groupMessages,
   isAwaitingFirstToken,
+  regenerateSlot,
 } from "../utils";
 import { AssistantMessage } from "./assistant-message";
-import { RegenerateButton } from "./regenerate-button";
 import { RunNotice } from "./run-notice";
 import { ToolMessage } from "./tool-message";
 import { UserMessage } from "./user-message";
@@ -25,16 +25,19 @@ function ItemContent({
   item,
   isLastAssistant,
   isStreaming,
+  onRegenerate,
 }: {
   item: RenderItem;
   isLastAssistant: boolean;
   isStreaming: boolean;
+  /** Given only to the item that carries the "answer again" action. */
+  onRegenerate: (() => void) | null;
 }) {
   if (item.kind === "tool") {
     return <ToolMessage item={item} />;
   }
   if (item.kind === "notice") {
-    return <RunNotice run={item.run} />;
+    return <RunNotice onRetry={onRegenerate} run={item.run} />;
   }
   if (item.message.role === "user") {
     return <UserMessage message={item.message} />;
@@ -44,6 +47,7 @@ function ItemContent({
       isLast={isLastAssistant}
       isStreaming={isStreaming}
       message={item.message}
+      onRegenerate={onRegenerate}
     />
   );
 }
@@ -64,22 +68,7 @@ export function ThreadDisplay({
   // The question is sent, no answer has started: the model is still working.
   const awaitingFirstToken = isAwaitingFirstToken(messages, isBusy);
   const { lastKey, streamingKey } = assistantDisplay(items, isBusy);
-
-  /*
-   * Lives inside the last item, never as a child of its own: the scroller
-   * finds a newly added message by its position among the children, and an
-   * extra child that comes and goes would shift it.
-   */
-  const tail = (
-    <>
-      {awaitingFirstToken && (
-        <Marker className="pl-10" role="status">
-          <MarkerContent className="shimmer">Thinking…</MarkerContent>
-        </Marker>
-      )}
-      {onRegenerate && <RegenerateButton onClick={onRegenerate} />}
-    </>
-  );
+  const redoKey = regenerateSlot(items);
 
   return (
     <MessageScrollerProvider autoScroll>
@@ -100,8 +89,19 @@ export function ThreadDisplay({
                   isLastAssistant={item.key === lastKey}
                   isStreaming={item.key === streamingKey}
                   item={item}
+                  onRegenerate={item.key === redoKey ? onRegenerate : null}
                 />
-                {index === items.length - 1 && tail}
+                {/*
+                 * Inside the last item, never a child of its own: the scroller
+                 * finds a newly added message by its position among the
+                 * children, and an extra child that comes and goes would
+                 * shift it.
+                 */}
+                {awaitingFirstToken && index === items.length - 1 && (
+                  <Marker className="pl-10" role="status">
+                    <MarkerContent className="shimmer">Thinking…</MarkerContent>
+                  </Marker>
+                )}
               </MessageScrollerItem>
             ))}
           </MessageScrollerContent>

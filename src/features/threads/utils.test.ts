@@ -5,6 +5,7 @@ import {
   filterThreads,
   groupMessages,
   isAwaitingFirstToken,
+  regenerateSlot,
 } from "./utils";
 
 const base = { position: 0, threadId: "t1" };
@@ -237,5 +238,57 @@ describe("assistantDisplay", () => {
       lastKey: null,
       streamingKey: null,
     });
+  });
+});
+
+describe("regenerateSlot", () => {
+  const notice = (runId: string): RunSummary => ({
+    id: runId,
+    provider: "anthropic",
+    model: "m",
+    status: "failed",
+    error: "boom",
+    startedAt: 0,
+    endedAt: null,
+  });
+  const withRun = (message: ThreadMessage, runId: string): ThreadMessage => ({
+    ...message,
+    runId,
+  });
+
+  it("is the last answer to the last question", () => {
+    const items = groupMessages([
+      user("u1"),
+      assistant("a1"),
+      user("u2"),
+      call("c1"),
+      result("c1"),
+      assistant("a2"),
+    ]);
+
+    expect(regenerateSlot(items)).toBe("a2");
+  });
+
+  it("stays on the answer when a stopped run's notice follows it", () => {
+    const items = groupMessages(
+      [withRun(user("u1"), "r1"), withRun(assistant("a1"), "r1")],
+      [notice("r1")]
+    );
+
+    expect(regenerateSlot(items)).toBe("a1");
+  });
+
+  it("falls back to the notice of a question that got no answer", () => {
+    const items = groupMessages(
+      [user("u1"), assistant("a1"), withRun(user("u2"), "r2")],
+      [notice("r2")]
+    );
+
+    expect(regenerateSlot(items)).toBe("run:r2");
+  });
+
+  it("is nothing for an unanswered question without a notice or an empty thread", () => {
+    expect(regenerateSlot(groupMessages([user("u1")]))).toBeNull();
+    expect(regenerateSlot([])).toBeNull();
   });
 });

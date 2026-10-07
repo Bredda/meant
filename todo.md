@@ -57,7 +57,7 @@ Un plan contient : un but, un « où on en est », des **Décisions** (chacune a
 
 ### Phase 5 — Régénérer
 
-- [x] Pipeline de run commun à `chat` et `regenerate` (`run_in_thread`), `replace_messages_after` transactionnel, `regenerate()` côté UI (`startRun` partagé avec `sendMessage`) et bouton « Regenerate » en bas du fil, hors run. Choix : le message utilisateur passe au nouveau run (un échec ou un arrêt antérieur ne laisse pas de notice périmée) ; arrêté avant toute sortie, le run garde l'ancienne réponse. Le bouton sert aussi de « réessayer » après un échec.
+- [x] Pipeline de run commun à `chat` et `regenerate` (`run_in_thread`), `replace_messages_after` transactionnel, `regenerate()` côté UI (`startRun` partagé avec `sendMessage`) et bouton « Regenerate » dans le pied du dernier message assistant (ou « Retry » dans la notice quand la question n'a pas de réponse), hors run. Choix : le message utilisateur passe au nouveau run (un échec ou un arrêt antérieur ne laisse pas de notice périmée) ; arrêté avant toute sortie, le run garde l'ancienne réponse. Après un échec ou un arrêt sans réponse, « Retry » dans la notice sert de « réessayer ».
 - **À exercer dans l'app** (pas fait) : régénérer, redémarrer, une seule réponse ; régénérer avec une clé invalide → l'ancienne réponse reste + erreur ; régénérer après un échec ; stop pendant une régénération.
 - **Vérif.** : tests repo (atomicité, ancienne réponse gardée en cas d'échec) ; dans l'app : régénérer, redémarrer, une seule réponse ; échec → l'ancienne réponse reste.
 

@@ -146,3 +146,33 @@ export function assistantDisplay(
       lastItem && isBusy && isAssistant(lastItem) ? lastItem.key : null,
   };
 }
+
+/**
+ * The item that carries the "answer again" action: the last assistant message
+ * after the last question, or, when that question got no answer (the run
+ * failed or was stopped first), the notice that follows it. `null` when
+ * there is nothing to answer again.
+ */
+export function regenerateSlot(items: RenderItem[]): string | null {
+  let slot: string | null = null;
+
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index];
+    if (!item) {
+      continue;
+    }
+    if (item.kind === "message" && item.message.role === "user") {
+      return slot;
+    }
+    const isAnswer = item.kind === "message";
+    const isNotice = item.kind === "notice";
+    if (isAnswer) {
+      return item.key;
+    }
+    if (isNotice && slot === null) {
+      slot = item.key;
+    }
+  }
+
+  return null;
+}
