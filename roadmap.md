@@ -28,7 +28,7 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 | --- | --- | --- | --- |
 | 1 | Socle du projet | Fait | Instructions agents, skills, hooks, revue appliquée, tests (Vitest, cargo), pre-push et CI, CI verte sur `main` |
 | 2 | Configuration et secrets | Fait | Assistant de premier lancement, préférences dans `config.toml`, clés Anthropic et OpenAI dans le vault, réglages. Fusionné, B5, R5 et S4 appliqués |
-| 3 | Conversations robustes | Ensuite | Streaming, persistance et appels d'outils fonctionnent ; manquent titres, gestion des fils, annulation, runs persistés |
+| 3 | Conversations robustes | Fait | Renommer et supprimer un fil, titre généré, runs persistés et affichés, annulation, outils en erreur, régénération, recherche par titre, suivi du scroll |
 | 4 | Fournisseurs et modèles | Ensuite | Deux fournisseurs, modèle codé en dur, premier fournisseur configuré utilisé |
 | 5 | Outils natifs et permissions | Plus tard | Un outil de démonstration (`echo`), pas de modèle de permissions |
 | 6 | MCP | Plus tard | Pas commencé |
@@ -59,7 +59,9 @@ Disponible (fusionné dans `main`) : écran d'amorçage (vault, configuration), 
 
 **But :** qu'un fil se comporte comme dans un client de chat sérieux : on retrouve, renomme, supprime et interrompt ses conversations, et un échec ne laisse jamais un fil incohérent.
 
-À faire : runs persistés (table `runs`, statut, erreur), titre généré après le premier échange, renommer et supprimer un fil, annuler un run en cours, régénérer la dernière réponse, recherche dans la liste des fils, signalement des outils en erreur (`is_error`). Dépend des migrations SQLite (R1) et de la persistance en transaction (R4) de `fixes.md`.
+Fait : runs persistés (table `runs`, statut, erreur) et affichés dans le fil, titre provisoire puis titre généré en arrière-plan (jamais sur un titre renommé à la main), renommer et supprimer un fil, annuler un run en cours (les messages produits sont conservés), régénérer la dernière réponse, recherche par titre dans la liste des fils, signalement des outils en erreur (`is_error`). Détail du fonctionnement dans `reference/agent-runtime.md`.
+
+Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui d'un run arrêté l'est), un outil en cours d'exécution au moment d'un arrêt est abandonné (à traiter avec les outils à effets de bord de l'axe 5).
 
 **Terminé quand :** un utilisateur interrompt une réponse, renomme puis supprime un fil, et retrouve après un redémarrage exactement ce qu'il voyait, échecs compris.
 
