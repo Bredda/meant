@@ -1,6 +1,6 @@
 pub mod echo;
 
-// `Execution` is not constructed yet: real tools (roadmap axis 5) will use it.
+// `Execution` is not constructed yet: real tools (roadmap axis 6) will use it.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ToolError {

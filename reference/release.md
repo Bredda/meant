@@ -62,5 +62,5 @@ Done in the repository settings, not in code:
 
 ## Not done yet
 
-- **Signing.** Installers are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first launch. Signing (Windows certificate, Apple Developer ID and notarization) is planned together with automatic updates (roadmap axis 10), which also need an updater key pair.
+- **Signing.** Installers are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first launch. Signing (Windows certificate, Apple Developer ID and notarization) is planned together with automatic updates (roadmap axis 11), which also need an updater key pair.
 - **The build job has not run yet.** It only runs on a real release, so the first one is the test: if `tauri-action` does not attach to the release created by release-please, check its `tagName` and `releaseName` inputs first.

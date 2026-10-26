@@ -8,7 +8,7 @@ use crate::vault::SecretStore;
 
 const PREAMBLE: &str = "You are a helpful assistant. Answer clearly and concisely.";
 
-/// The model each provider runs, until model selection exists (roadmap axis 4).
+/// The model each provider runs, until model selection exists (roadmap axis 5).
 pub fn model_id(provider: ProviderId) -> &'static str {
     match provider {
         ProviderId::Anthropic => anthropic::completion::CLAUDE_SONNET_4_6,
