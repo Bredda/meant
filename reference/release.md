@@ -10,7 +10,7 @@ branch (one plan / phase of todo.md)
    │  pre-push:   typecheck, Biome, cargo fmt, clippy
    ▼
 pull request ──► CI "checks" (commit messages, types, Biome, tests, build, rustfmt, clippy, cargo test)
-   │  merge commit or rebase (not squash)
+   │  merge commit (not squash, not rebase)
    ▼
 main ──► release-please keeps a "release PR" up to date (CHANGELOG.md + version bump)
    │  merging the release PR is the manual step that cuts a release
@@ -23,7 +23,9 @@ tag vX.Y.Z + GitHub release ──► installers built and attached (Linux, Wind
 - `main` is always releasable and only changes through a pull request.
 - One branch per plan, or per phase of a long plan (see `todo.md`): branches that live for weeks drift from `main` and produce pull requests nobody can review. Name them `<type>/<topic>` (`feat/thread-management`, `fix/review-fixes`).
 - Commits are atomic and follow [Conventional Commits](https://www.conventionalcommits.org/): `feat`, `fix`, `perf`, `refactor`, `docs`, `chore`, `style`, `test`, `ci`, `build`. Release tooling reads them, so `commitlint` rejects other formats locally (`commit-msg` hook) and in CI.
-- Merge pull requests with a **merge commit or rebase**. A squash replaces the atomic commits by one, and the changelog then has one line per pull request.
+- Merge pull requests with a **merge commit**, the only method enabled. A squash replaces the atomic commits by one (the changelog then has one line per pull request); a rebase rewrites the commits that `pre-push` checked and leaves the local branch looking unmerged. A merge commit keeps both, gives `git log --first-parent main` one line per pull request, and lets `git revert -m 1` undo a whole pull request.
+- Since merging keeps every commit, tidy them (fixups, corrections) while the branch is still private. Do not enable "Require linear history" in the ruleset: it would block merge commits.
+- To stop a branch created from `origin/main` from tracking `main` (a plain `git push` would then target it), set `git config --global branch.autoSetupMerge simple`.
 - Never edit `CHANGELOG.md`, the version in `package.json` or in `src-tauri/Cargo.toml` by hand: the release PR owns them.
 
 ## What triggers what
@@ -58,7 +60,7 @@ Done in the repository settings, not in code:
 
 1. **Release PR token.** A pull request opened with the default `GITHUB_TOKEN` does not trigger other workflows, so the release PR would never get its CI. Create a fine-grained personal access token for this repository (permissions: *Contents* and *Pull requests*, read and write) and store it as the Actions secret `RELEASE_PLEASE_TOKEN`. Until it exists the workflow falls back to `GITHUB_TOKEN`, which also needs *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
 2. **Protect `main`** (a ruleset): require a pull request, require the status check `checks`, block force pushes. No approval count is needed for a solo project. Do this after step 1, otherwise the release PR can never satisfy the required check.
-3. **Merge methods** (*Settings → General*): allow merge commits and rebase merges, disable squash merging.
+3. **Merge methods** (*Settings → General*): allow merge commits only, disable squash and rebase merging, and turn on "Automatically delete head branches".
 
 ## Not done yet
 
