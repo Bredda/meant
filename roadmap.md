@@ -11,7 +11,7 @@ l'utilisateur configure un fournisseur → il ouvre un fil avec un agent → l'a
 appelle des outils autorisés sur la machine → le fil, ses runs et leurs coûts restent consultables localement
 ```
 
-Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, vault, réglages). Il manque de quoi en faire un outil de travail : des conversations robustes, le choix du modèle, et surtout des outils utiles avec un modèle de permissions.
+Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, vault, réglages). Les conversations sont robustes ; il manque de quoi en faire un outil de travail complet : choisir son modèle, échanger des images, des documents et de l'audio, et surtout des outils utiles avec un modèle de permissions.
 
 ## Principes
 
@@ -29,13 +29,14 @@ Le socle technique est là (Tauri, cœur Rust, streaming, persistance SQLite, va
 | 1 | Socle du projet | Fait | Instructions agents, skills, hooks, revue appliquée, tests (Vitest, cargo), pre-push et CI, CI verte sur `main` |
 | 2 | Configuration et secrets | Fait | Assistant de premier lancement, préférences dans `config.toml`, clés Anthropic et OpenAI dans le vault, réglages. Fusionné, B5, R5 et S4 appliqués |
 | 3 | Conversations robustes | Fait | Renommer et supprimer un fil, titre généré, runs persistés et affichés, annulation, outils en erreur, régénération, recherche par titre, suivi du scroll |
-| 4 | Fournisseurs et modèles | Ensuite | Deux fournisseurs, modèle codé en dur, premier fournisseur configuré utilisé |
-| 5 | Outils natifs et permissions | Plus tard | Un outil de démonstration (`echo`), pas de modèle de permissions |
-| 6 | MCP | Plus tard | Pas commencé |
-| 7 | Agents configurables | Plus tard | Un seul agent implicite (préambule codé en dur) |
-| 8 | Modèles locaux | Plus tard | Pas commencé |
-| 9 | Connaissances locales | Plus tard | Pas commencé |
-| 10 | Distribution | En cours | Flux de release en place (release-please, installeurs Linux, Windows et macOS en CI), installeurs non signés, pas de mise à jour automatique |
+| 4 | Fournisseurs et modèles | Ensuite | Deux fournisseurs, modèle codé en dur, premier fournisseur configuré utilisé, aucune notion de capacités |
+| 5 | Multi-modalité | Ensuite | Texte seul : un message est une chaîne, pas de pièce jointe, pas d'autre sortie que du texte ; dépend du modèle du fil (axe 4) |
+| 6 | Outils natifs et permissions | Plus tard | Un outil de démonstration (`echo`), pas de modèle de permissions |
+| 7 | MCP | Plus tard | Pas commencé |
+| 8 | Agents configurables | Plus tard | Un seul agent implicite (préambule codé en dur) |
+| 9 | Modèles locaux | Plus tard | Pas commencé |
+| 10 | Connaissances locales | Plus tard | Pas commencé |
+| 11 | Distribution | En cours | Flux de release en place (release-please, installeurs Linux, Windows et macOS en CI), installeurs non signés, pas de mise à jour automatique |
 
 ## 1. Socle du projet
 
@@ -61,19 +62,39 @@ Disponible (fusionné dans `main`) : écran d'amorçage (vault, configuration), 
 
 Fait : runs persistés (table `runs`, statut, erreur) et affichés dans le fil, titre provisoire puis titre généré en arrière-plan (jamais sur un titre renommé à la main), renommer et supprimer un fil, annuler un run en cours (les messages produits sont conservés), régénérer la dernière réponse, recherche par titre dans la liste des fils, signalement des outils en erreur (`is_error`). Détail du fonctionnement dans `reference/agent-runtime.md`.
 
-Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui d'un run arrêté l'est), un outil en cours d'exécution au moment d'un arrêt est abandonné (à traiter avec les outils à effets de bord de l'axe 5).
+Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui d'un run arrêté l'est), un outil en cours d'exécution au moment d'un arrêt est abandonné (à traiter avec les outils à effets de bord de l'axe 6).
 
 **Terminé quand :** un utilisateur interrompt une réponse, renomme puis supprime un fil, et retrouve après un redémarrage exactement ce qu'il voyait, échecs compris.
 
 ## 4. Fournisseurs et modèles
 
-**But :** choisir son modèle par fil, et brancher d'autres fournisseurs sans toucher au reste de l'application.
+**But :** choisir son modèle par fil, savoir ce que chaque modèle accepte et produit, et brancher d'autres fournisseurs sans toucher au reste de l'application.
 
-À faire : liste des modèles par fournisseur, modèle choisi au niveau du fil (avec un défaut dans les réglages), sélecteur dans la zone de saisie, suppression de `default_provider`. Ensuite, fournisseurs compatibles OpenAI (OpenRouter, Mistral, endpoints personnalisés). Coût et tokens par run affichés dans le fil.
+À faire : liste des modèles par fournisseur, **avec leurs capacités** (types de contenu acceptés en entrée et produits en sortie : texte, image, document, audio…), modèle choisi au niveau du fil (avec un défaut dans les réglages), sélecteur dans la zone de saisie, suppression de `default_provider`. Les capacités sont une donnée du catalogue des modèles, pas un cas particulier : l'axe 5 s'en sert pour refuser une pièce jointe avant l'envoi, et pour cela l'interface doit connaître le modèle d'un fil avant l'envoi (aujourd'hui Rust choisit le fournisseur au moment du run). Ensuite, fournisseurs compatibles OpenAI (OpenRouter, Mistral, endpoints personnalisés). Coût et tokens par run affichés dans le fil.
 
-**Terminé quand :** deux fils ouverts en même temps utilisent deux modèles de deux fournisseurs différents, et chaque run affiche son modèle et son coût.
+**Terminé quand :** deux fils ouverts en même temps utilisent deux modèles de deux fournisseurs différents, chaque run affiche son modèle et son coût, et l'interface sait, pour chaque fil, ce que son modèle accepte.
 
-## 5. Outils natifs et permissions
+## 5. Multi-modalité
+
+**But :** échanger autre chose que du texte. L'utilisateur joint des images, des documents et de l'audio à un message ; l'agent peut produire des images (puis de l'audio) ; une pièce jointe reste sur la machine jusqu'à l'envoi du message. Dépend de l'axe 4 : ce qu'on peut joindre dépend du modèle du fil.
+
+Aujourd'hui un message est une chaîne (`content`) et seul le texte arrive en flux. Rig porte déjà les parties image, audio, vidéo et document en entrée, et l'image en sortie (réponse de l'assistant et résultat d'outil) : le travail est dans notre modèle de données, notre stockage et notre interface, pas dans la bibliothèque.
+
+À cadrer :
+
+- **Modèle de données.** Un message devient une liste de *parties* (texte, image, audio, document, vidéo plus tard). Les lignes existantes deviennent une seule partie texte (migration SQLite) ; `StoredThreadMessage`, `ThreadMessage`, `src/lib/types.ts` et `to_rig_message` changent ensemble.
+- **Stockage.** Les octets vont dans un dossier de données local, en fichiers nommés par empreinte (une pièce jointe réutilisée n'est stockée qu'une fois) ; la base ne garde que la référence, le type MIME, la taille et le nom. Jamais de base64 dans SQLite ni dans l'état React.
+- **Entrée.** Le menu « + » de la zone de saisie (esquissé dans `thread-input.tsx`), le glisser-déposer et le collage d'une image ; aperçu avant l'envoi, retrait, limites de taille et de nombre. À trancher : comment les octets passent à Rust (sélecteur natif et chemin, ou IPC binaire). La CSP laisse déjà passer `img-src blob:` ; l'audio et la vidéo demanderont d'ouvrir `media-src`.
+- **Capacités des modèles.** Fournies par le catalogue de l'axe 4 (types acceptés en entrée et produits en sortie, par modèle). Une pièce jointe que le modèle du fil ne sait pas lire est refusée avant l'envoi, avec un message clair, plutôt que par une erreur du fournisseur.
+- **Sortie.** Parties non textuelles produites par le modèle et images renvoyées par un outil : événements de flux dédiés, identifiants stables entre le direct et le persisté (snapshot + remplacement inchangé), rendu dans le fil.
+- **Audio.** Entrée native quand le modèle l'accepte, transcription sinon ; enregistrement au micro et réponse vocale à part, en dernier.
+- **Confidentialité.** Une pièce jointe ne quitte la machine qu'avec le message envoyé, et aucune URL distante renvoyée par un modèle n'est chargée automatiquement.
+
+Ordre prévu : images en entrée, documents (PDF, texte, code), images en sortie, audio, vidéo. À ne pas confondre avec l'axe 10 : là le fichier est indexé pour être retrouvé, ici il voyage avec le message.
+
+**Terminé quand :** l'utilisateur joint une image et un PDF à un message, pose une question dessus et obtient une réponse qui s'y appuie ; après un redémarrage le fil réaffiche les pièces jointes à l'identique ; et une pièce jointe que le modèle du fil ne gère pas est refusée avant l'envoi.
+
+## 6. Outils natifs et permissions
 
 **But :** que l'agent agisse sur la machine (fichiers, Git, shell) sous le contrôle explicite de l'utilisateur.
 
@@ -81,23 +102,23 @@ Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui
 
 **Terminé quand :** l'agent lit et modifie un fichier d'un dossier autorisé après une confirmation dans le fil, et un refus est rendu au modèle qui continue sans planter.
 
-## 6. MCP
+## 7. MCP
 
 **But :** brancher des serveurs MCP comme sources d'outils, avec le même modèle de permissions que les outils natifs.
 
-À faire : configuration des serveurs (stdio et HTTP) dans les réglages, cycle de vie des processus côté Rust, exposition des outils MCP à l'agent via la même abstraction que les outils natifs. Rien de spécifique à MCP ne doit fuir dans l'interface ni dans la boucle de l'agent. Dépend de l'axe 5.
+À faire : configuration des serveurs (stdio et HTTP) dans les réglages, cycle de vie des processus côté Rust, exposition des outils MCP à l'agent via la même abstraction que les outils natifs. Rien de spécifique à MCP ne doit fuir dans l'interface ni dans la boucle de l'agent. Dépend de l'axe 6.
 
 **Terminé quand :** un serveur MCP ajouté dans les réglages fournit des outils utilisables dans un fil, soumis aux mêmes permissions.
 
-## 7. Agents configurables
+## 8. Agents configurables
 
 **But :** faire de l'agent l'abstraction principale : un agent = un préambule, un modèle, un jeu d'outils.
 
-À faire : bibliothèque d'agents locale (créer, dupliquer, modifier), choix de l'agent à la création d'un fil, agent par défaut. Dépend des axes 4 et 5.
+À faire : bibliothèque d'agents locale (créer, dupliquer, modifier), choix de l'agent à la création d'un fil, agent par défaut. Dépend des axes 4 et 6.
 
 **Terminé quand :** l'utilisateur crée un agent « relecteur de code » avec son modèle et ses outils, et l'utilise dans un nouveau fil.
 
-## 8. Modèles locaux
+## 9. Modèles locaux
 
 **But :** utiliser un modèle qui tourne sur la machine, sans rien changer à l'architecture.
 
@@ -105,7 +126,7 @@ Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui
 
 **Terminé quand :** un fil fonctionne entièrement hors ligne avec un modèle local, outils compris.
 
-## 9. Connaissances locales
+## 10. Connaissances locales
 
 **But :** que l'agent s'appuie sur les documents de l'utilisateur sans les envoyer ailleurs qu'au modèle.
 
@@ -113,7 +134,7 @@ Limites connues : le texte partiel d'un run en échec n'est pas conservé (celui
 
 **Terminé quand :** l'agent répond à une question sur un dossier indexé en citant les fichiers sources.
 
-## 10. Distribution
+## 11. Distribution
 
 **But :** installer et mettre à jour Meant sans passer par le code source.
 
